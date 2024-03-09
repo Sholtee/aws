@@ -19,45 +19,50 @@ Resources:
       Code:
         ZipFile: |
           'use strict';
-          exports.handler = (event, context, callback) => {          
-            const request = event.Records[0].cf.request;
-            console.log(`Request available: ${JSON.stringify(request)}`)
+          exports.handler = (event, context, callback) => {
+            try {          
+              const request = event.Records[0].cf.request;
+              console.log(`Request available: ${JSON.stringify(request)}`);
             
-            switch(request.uri) {
-              case '/index.html':
-                console.log('Serving "index.html"');
-                callback(null, request);
-                break;
-              case '/':
-                console.log('Routing to "index.html"');
-                request.uri = '/index.html';
-                callback(null, request);
-                break;
-              default:
-                console.log('Returning 404');
-                callback(null, {
-                  status: '404',
-                  statusDescription: 'Not Found',
-                  headers: {
-                    'content-type': [{
-                      key: 'Content-Type',
-                      value: 'text/html'
-                    }]
-                  },
-                  body: `
-                    <\!DOCTYPE html>
-                    <html lang="en">
-                      <head>
-                        <meta charset="utf-8">
-                        <title>Not Found</title>
-                      </head>
-                      <body>
-                        <p>Not found</p>
-                      </body>
-                    </html>
-                  `
-                });
-                break;
+              switch(request.uri) {
+                case '/index.html':
+                  console.log('Serving "index.html"');
+                  callback(null, request);
+                  break;
+                case '/':
+                  console.log('Routing to "index.html"');
+                  request.uri = '/index.html';
+                  callback(null, request);
+                  break;
+                default:
+                  console.log('Returning 404');
+                  callback(null, {
+                    status: '404',
+                    statusDescription: 'Not Found',
+                    headers: {
+                      'content-type': [{
+                        key: 'Content-Type',
+                        value: 'text/html'
+                      }]
+                    },
+                    body: `
+                      <\!DOCTYPE html>
+                      <html lang="en">
+                        <head>
+                          <meta charset="utf-8">
+                          <title>Not Found</title>
+                        </head>
+                        <body>
+                          <p>Not found</p>
+                        </body>
+                      </html>
+                    `
+                  });
+                  break;
+              }           
+            } catch (err) {
+              console.error(err);
+              return callback(err);
             }
           };
       FunctionName: !Sub "${app}-router"

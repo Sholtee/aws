@@ -1,9 +1,9 @@
 #
-# Deploy-Global.ps1
+# Deploy-Foundation.ps1
 #
 # Author: Denes Solti
 #
-# Usage: Deploy-Global.ps1 -action [create|update] -app appName -profile profileName
+# Usage: Deploy-Foundation.ps1 -action [create|update] -app appName -region regionName -profile profileName
 #
 
 param(
@@ -14,6 +14,9 @@ param(
     [string]$app,
 	
 	[Parameter(Position=2, Mandatory=$true)]
+    [string]$region,
+	
+	[Parameter(Position=3, Mandatory=$true)]
     [string]$profile
 )
 
@@ -21,8 +24,8 @@ $ErrorActionPreference = "Stop"
 
 aws cloudformation ${action}-stack `
     --profile ${profile} `
-	--stack-name ${app}-globals `
-	--region us-east-1 `
-	--template-body file://./global.yml `
+	--stack-name ${app}-foundation `
+	--region ${region} `
+	--template-body file://./foundation.yml `
 	--parameters "ParameterKey=app,ParameterValue=${app}" `
 	--capabilities CAPABILITY_NAMED_IAM
