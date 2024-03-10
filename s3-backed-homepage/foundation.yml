@@ -116,15 +116,15 @@ Resources:
           'use strict';
           const
             {send, SUCCESS, FAILED} = require('cfn-response'),          
-            {SSM} = require('aws-sdk');
+            {SSMClient, GetParameterCommand} = require('@aws-sdk/client-ssm');
 
           exports.handler = async (event, context) => {
             console.log('Getting global parameter...');
             try {          
               const
-                ssm = new SSM({region: 'us-east-1'}),
+                client = new SSMClient({region: 'us-east-1'}),
                 {ResourceProperties: {Parameter}} = event,
-                {Parameter: {Value}} = await ssm.getParameter({Name: Parameter}).promise();
+                {Parameter: {Value}} = await client.send(new GetParameterCommand({Name: Parameter}));
 
               console.log(`Parameter "${Parameter}" fetched: ${Value}`);
               await send(event, context, SUCCESS, {Value});
@@ -134,7 +134,7 @@ Resources:
             }
           };
       Handler: index.handler
-      Runtime: nodejs16.x  # We want to use SDK v2 which is not bundled with nodejs18.x
+      Runtime: nodejs18.x
       FunctionName: !Sub "${app}-fetch-global-parameter-lambda"
       Role: !GetAtt FetchGlobalParameterFunctionExecutionRole.Arn
       MemorySize: 128
