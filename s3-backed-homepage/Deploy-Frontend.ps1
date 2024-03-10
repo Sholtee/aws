@@ -16,6 +16,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+Write-Host Removing old content:
+aws s3 rm s3://${app}-frontend --recursive --profile ${profile}
+
+Write-Host `nUploading new content:
 Set-Location -Path .\frontend
 try {
   Get-ChildItem -Path . -Attributes Archive -Recurse | ForEach-Object {
@@ -26,9 +30,10 @@ try {
   Set-Location -Path .\..
 }
 
+Write-Host `nInvalidating CloudFront distribution:
 foreach ($distro in (aws cloudfront list-distributions --profile ${profile} | ConvertFrom-Json).DistributionList.Items) {
-  if ($distro.Origins.Items | Where {$_.DomainName -Contains "${app}-frontend.s3.amazonaws.com" | Select -First 1 }) {
-    Write-Host Invalidating: $distro.Id
+  if ($distro.Origins.Items | Where {$_.DomainName -Eq "${app}-frontend.s3.amazonaws.com" | Select -First 1 }) {
+    Write-Host $distro.Id
     aws cloudfront create-invalidation --distribution-id $distro.Id --paths "/*" --profile ${profile} | Out-Null
   }
 }
