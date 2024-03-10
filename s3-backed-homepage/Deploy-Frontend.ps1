@@ -3,7 +3,7 @@
 #
 # Author: Denes Solti
 #
-# Usage: Deploy-Frontend.ps1 -action -app appName -profile profileName
+# Usage: Deploy-Frontend.ps1 -app appName -profile profileName
 #
 
 param(
