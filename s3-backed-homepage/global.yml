@@ -78,12 +78,6 @@ Resources:
       Description: Lambda version. Lambda@Edge requires exact version
       FunctionName: !Ref RouterLambda
 
-  RouterLambdaLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub "/aws/lambda/${app}-router"
-      RetentionInDays: 90
-
   RouterLambdaRole:
     Type: AWS::IAM::Role
     Properties:
@@ -99,6 +93,14 @@ Resources:
           Action:
           - sts:AssumeRole
       Policies:
+        - PolicyName: allowLambdaLogging
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:*"
+                Resource: "*"
         - PolicyName: allowCloudFrontReplication
           PolicyDocument:
             Version: '2012-10-17'
@@ -111,8 +113,6 @@ Resources:
                 - iam:CreateServiceLinkedRole
                 - cloudfront:UpdateDistribution
               Resource: '*'
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
         
   RouterLambdaId:
     Type: AWS::SSM::Parameter
