@@ -1,0 +1,198 @@
+#####################################################
+# foundation.yml
+#
+# Author: Denes Solti
+#####################################################
+Description: Foundation infrastructure. Can be deployed in any region
+
+Parameters:
+  app:
+    Type: String
+    Description: The aplication name (including prefix)
+    MaxLength: '32'
+  deploymentId:
+    Type: String
+    Description: The unique deployment id. Must be changed in each deployment
+    MaxLength: '50'
+    
+Resources:
+  ###################
+  # 404 handler
+  ###################
+ 
+  404HandlerLambda:
+    Type: AWS::Lambda::Function
+    Description: Function returning 404
+    Properties:     
+      Code:
+        ZipFile: |
+          export function handler(event, context, callback) {
+            try {          
+              const request = event.Records[0].cf.request;
+              console.log(`Returning 404 for request: ${JSON.stringify(request)}`);
+            
+              callback(null, {
+                statusCode: 404,
+                headers: {
+                  'Content-Type': 'text/html'
+                },
+                body: `
+                  <!DOCTYPE html>
+                  <html lang="en">
+                    <head>
+                      <meta charset="utf-8">
+                      <title>Not Found</title>
+                    </head>
+                    <body>
+                      <p>Not found</p>
+                    </body>
+                  </html>
+                `
+              });         
+            } catch (err) {
+              console.error(err);
+              return callback(err);
+            }
+          }
+      FunctionName: !Sub "${app}-404-handler"
+      Handler: index.handler
+      Role: !GetAtt 404HandlerLambdaRole.Arn
+      Runtime: nodejs20.x
+      Timeout: 10
+      MemorySize: 128
+      
+  404HandlerLambdaUrl:
+    Type: "AWS::Lambda::Url"
+    Properties:
+      AuthType: AWS_IAM
+      TargetFunctionArn: !Ref 404HandlerLambda
+
+  404HandlerLambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - "sts:AssumeRole"
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+      Policies:
+        - PolicyName: allowLambdaLogging
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:*"
+                Resource: "*"
+
+  404HandlerLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref 404HandlerLambda
+      Principal: '*'
+      Action: 'lambda:InvokeFunctionUrl'
+      FunctionUrlAuthType: AWS_IAM
+            
+  ###################
+  # CloudFront
+  ###################
+
+  CloudFrontDistro:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        HttpVersion: http2
+        Origins:
+          - DomainName: !Select [2, !Split ["/", !GetAtt 404HandlerLambdaUrl.FunctionUrl]]
+            Id: '404HandlerLambdaOrigin'
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - 'GET'
+            - 'HEAD'
+            - 'OPTIONS'
+          ViewerProtocolPolicy: redirect-to-https
+          OriginRequestPolicyId: "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
+          CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
+          TargetOriginId: 404HandlerLambdaOrigin
+          LambdaFunctionAssociations:
+            - EventType: origin-request
+              LambdaFunctionARN: !GetAtt RequestSignerLambdaId.Value
+              IncludeBody: true
+
+  ###################
+  # Global access
+  ###################        
+      
+  RequestSignerLambdaId:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      DeploymentId: !Ref deploymentId
+      Parameter: !Sub "${app}-request-signer-lambda-id"
+      ServiceToken: !GetAtt FetchGlobalParameterFunction.Arn
+
+  FetchGlobalParameterFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import {send, SUCCESS, FAILED} from 'cfn-response';          
+          import {SSMClient, GetParameterCommand} from '@aws-sdk/client-ssm';
+
+          export async function handler(event, context) {
+            console.log('Getting global parameter...');
+            try {          
+              const
+                client = new SSMClient({region: 'us-east-1'}),
+                {ResourceProperties: {Parameter}} = event,
+                {Parameter: {Value}} = await client.send(new GetParameterCommand({Name: Parameter}));
+
+              console.log(`Parameter "${Parameter}" fetched: ${Value}`);
+              await send(event, context, SUCCESS, {Value});
+            } catch (err) {
+              console.error(err);
+              await send(event, context, FAILED, err);
+            }
+          }
+      Handler: index.handler
+      Runtime: nodejs20.x
+      FunctionName: !Sub "${app}-fetch-global-parameter-lambda"
+      Role: !GetAtt FetchGlobalParameterFunctionExecutionRole.Arn
+      MemorySize: 128
+      Timeout: 20
+
+  FetchGlobalParameterFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+        - PolicyName: allowLambdaLogging
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:*"
+                Resource: "*"
+        - PolicyName: allowSSMAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: '*'

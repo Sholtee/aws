@@ -27,16 +27,14 @@ Resources:
               switch(request.uri) {
                 case '/index.html':
                   console.log('Serving "index.html"');
-                  callback(null, request);
-                  break;
+                  return callback(null, request);
                 case '/':
                   console.log('Routing to "index.html"');
                   request.uri = '/index.html';
-                  callback(null, request);
-                  break;
+                  return callback(null, request);
                 default:
                   console.log('Returning 404');
-                  callback(null, {
+                  return callback(null, {
                     status: '404',
                     statusDescription: 'Not Found',
                     headers: {
@@ -58,7 +56,6 @@ Resources:
                       </html>
                     `
                   });
-                  break;
               }           
             } catch (err) {
               console.error(err);

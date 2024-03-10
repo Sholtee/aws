@@ -1,0 +1,152 @@
+#####################################################
+# global.yml
+#
+# Author: Denes Solti
+#####################################################
+Description: Global infrastructure. Needs to deployed in "us-east-1" region
+
+Parameters:
+  app:
+    Type: String
+    Description: The aplication name (including prefix)
+    MaxLength: '32'
+
+Resources:
+  RequestSignerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Lambda that signs the incoming requests. Required for IAM validation
+      Code:
+        ZipFile: !Sub |
+          import {SSMClient, GetParameterCommand} from '@aws-sdk/client-ssm';
+          import {CrtSignerV4} from '@aws-sdk/signature-v4-crt';
+          
+          const
+            sigV4 = new CrtSignerV4({
+              service: 'lambda',
+              region: 'us-east-1',
+              credentials: {
+                accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+                sessionToken: process.env.AWS_SESSION_TOKEN
+              }
+            }),
+            excludedHeaders = await getExcludedHeaders();   
+            
+          export async function handler(event, context, callback) {
+            try {
+              console.log('Request available: ' + JSON.stringify(event));  
+          
+              const
+                request = event.Records[0].cf.request,     
+                signed = await sigV4.sign(
+                  {
+                    method: request.method,
+                    headers: Object
+                      .entries(request.headers)
+                      .filter(([key]) => excludedHeaders.indexOf(key) < 0)
+                      .map(([_, header]) => ({[header[0].key]: header[0].value}))
+                      .reduce((accu, curr) => ({...accu, ...curr}), {}),
+                    body: request.body?.data
+                  },
+                  {
+                    signingRegion: /(?<urlid>\w+)\.lambda-url\.(?<region>[\w-]+)\.on\.aws/i
+                      .exec(request.headers.host[0].value)
+                      .groups
+                      .region
+                  }
+                );
+              
+              request.headers = Object
+                .entries(signed.headers)
+                .map(([key, value]) => ({[key.toLowerCase()]: [{key: key, value}]}))
+                .reduce((accu, curr) => ({...accu, ...curr}), {});
+              
+              console.log('Request signed successfully: ' + JSON.stringify(request));
+  
+              return callback(null, request);
+            } catch (err) {
+              console.error(err);
+              return callback(err);
+            }
+          }
+          
+          async function getExcludedHeaders() {
+            const
+              client = new SSMClient({region: 'us-east-1'}),
+              {Parameter: {Value}} = await client.send(new GetParameterCommand({Name: '${app}-request-signer-excluded-headers'}));
+            return Value.split(',');
+          }
+      FunctionName: !Sub "${app}-request-signer"
+      Handler: index.handler
+      Role: !GetAtt RequestSignerLambdaRole.Arn
+      Runtime: nodejs20.x
+      Timeout: 5
+      MemorySize: 128
+
+  RequestSignerLambdaVersion:
+    Type: AWS::Lambda::Version
+    Properties:
+      Description: Lambda version. Lambda@Edge requires exact version
+      FunctionName: !Ref RequestSignerLambda
+
+  RequestSignerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+            - edgelambda.amazonaws.com
+            - replicator.lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+        - PolicyName: allowLambdaLogging
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:*"
+                Resource: "*"
+        - PolicyName: allowSSMAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter*
+                Resource: '*'
+        - PolicyName: allowCloudFrontReplication
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+                - lambda:GetFunction
+                - lambda:EnableReplication*
+                - lambda:InvokeFunction
+                - iam:CreateServiceLinkedRole
+                - cloudfront:UpdateDistribution
+              Resource: '*'
+  
+        
+  RequestSignerExcludedHeaders:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Headers to be excluded when signing the request
+      Name: !Sub "${app}-request-signer-excluded-headers"
+      Value: x-forwarded-for,te
+      Type: String
+  
+  RequestSignerLambdaId:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Lambda ID. Resources from other regions can use this parameter. It requires as cross region export/import is not allowed (03.09.2024)
+      Name: !Sub "${app}-request-signer-lambda-id"
+      Value: !Ref RequestSignerLambdaVersion
+      Type: String
