@@ -25,3 +25,10 @@ try {
 } finally {
 	Set-Location -Path .\..
 }
+
+foreach ($distro in (aws cloudfront list-distributions --profile ${profile} | ConvertFrom-Json).DistributionList.Items) {
+	if ($distro.Origins.Items | Where {$_.DomainName -Contains "${app}-frontend.s3.amazonaws.com" | Select -First 1 }) {
+		Write-Host Invalidating: $distro.Id
+		aws cloudfront create-invalidation --distribution-id $distro.Id --paths "/*" --profile ${profile} | Out-Null
+	}
+}
