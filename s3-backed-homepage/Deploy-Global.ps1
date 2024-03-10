@@ -7,13 +7,13 @@
 #
 
 param(
-	[Parameter(Position=0, Mandatory=$true)]
+    [Parameter(Position=0, Mandatory=$true)]
     [string]$action,
 	
-	[Parameter(Position=1, Mandatory=$true)]
+    [Parameter(Position=1, Mandatory=$true)]
     [string]$app,
 	
-	[Parameter(Position=2, Mandatory=$true)]
+    [Parameter(Position=2, Mandatory=$true)]
     [string]$profile
 )
 
