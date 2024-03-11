@@ -58,7 +58,7 @@ Resources:
       FunctionName: !Sub "${app}-404-handler"
       Handler: index.handler
       Role: !GetAtt 404HandlerLambdaRole.Arn
-      Runtime: nodejs20.x
+      Runtime: nodejs18.x
       Timeout: 10
       MemorySize: 128
       
@@ -164,7 +164,7 @@ Resources:
             }
           };
       Handler: index.handler
-      Runtime: nodejs20.x
+      Runtime: nodejs18.x
       FunctionName: !Sub "${app}-fetch-global-parameter-lambda"
       Role: !GetAtt FetchGlobalParameterFunctionExecutionRole.Arn
       MemorySize: 128

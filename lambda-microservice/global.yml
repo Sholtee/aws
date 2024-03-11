@@ -21,15 +21,30 @@ Resources:
           'use strict';
           const
             {SSMClient, GetParameterCommand} = require('@aws-sdk/client-ssm'),
-            {CrtSignerV4} = require('@aws-sdk/signature-v4-crt'),
-            sigV4 = new CrtSignerV4({
+            {SignatureV4} = require('@aws-sdk/signature-v4'),
+            {createHash, createHmac} = require('crypto');
+            
+          class Sha256 {
+            constructor(secret) {
+              this.hash = secret ? createHmac('sha256', secret) : createHash('sha256');
+            }
+            update(array) {
+              this.hash.update(array);
+            }
+            digest() {
+              return Promise.resolve(new Uint8Array(this.hash.digest().buffer));
+            }
+          } 
+            
+          const sigV4 = new SignatureV4({
               service: 'lambda',
               region: 'us-east-1',
               credentials: {
                 accessKeyId: process.env.AWS_ACCESS_KEY_ID,
                 secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
                 sessionToken: process.env.AWS_SESSION_TOKEN
-              }
+              },
+              sha256: Sha256
             });   
             
           exports.handler = async function(event, context, callback) {
@@ -42,6 +57,9 @@ Resources:
                 signed = await sigV4.sign(
                   {
                     method: request.method,
+                    protocol: 'https',
+                    path: request.uri,
+                    // query: ...,
                     headers: Object
                       .entries(request.headers)
                       .filter(([key]) => excludedHeaders.indexOf(key) < 0)
@@ -84,7 +102,7 @@ Resources:
       FunctionName: !Sub "${app}-request-signer"
       Handler: index.handler
       Role: !GetAtt RequestSignerLambdaRole.Arn
-      Runtime: nodejs20.x
+      Runtime: nodejs18.x
       Timeout: 5
       MemorySize: 128
 
