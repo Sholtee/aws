@@ -26,7 +26,8 @@ Resources:
     Properties:     
       Code:
         ZipFile: |
-          export function handler(event, context, callback) {
+          'use strict';
+          exports.handler = function(event, context, callback) {
             try {          
               const request = event.Records[0].cf.request;
               console.log(`Returning 404 for request: ${JSON.stringify(request)}`);
@@ -53,7 +54,7 @@ Resources:
               console.error(err);
               return callback(err);
             }
-          }
+          };
       FunctionName: !Sub "${app}-404-handler"
       Handler: index.handler
       Role: !GetAtt 404HandlerLambdaRole.Arn
@@ -142,10 +143,12 @@ Resources:
     Properties:
       Code:
         ZipFile: |
-          import {send, SUCCESS, FAILED} from 'cfn-response';          
-          import {SSMClient, GetParameterCommand} from '@aws-sdk/client-ssm';
+          'use strict';
+          const
+            {send, SUCCESS, FAILED} = require('cfn-response'),          
+            {SSMClient, GetParameterCommand} = require('@aws-sdk/client-ssm');
 
-          export async function handler(event, context) {
+          exports.handler = async function(event, context) {
             console.log('Getting global parameter...');
             try {          
               const
@@ -159,7 +162,7 @@ Resources:
               console.error(err);
               await send(event, context, FAILED, err);
             }
-          }
+          };
       Handler: index.handler
       Runtime: nodejs20.x
       FunctionName: !Sub "${app}-fetch-global-parameter-lambda"

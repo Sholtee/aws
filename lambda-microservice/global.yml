@@ -18,10 +18,10 @@ Resources:
       Description: Lambda that signs the incoming requests. Required for IAM validation
       Code:
         ZipFile: !Sub |
-          import {SSMClient, GetParameterCommand} from '@aws-sdk/client-ssm';
-          import {CrtSignerV4} from '@aws-sdk/signature-v4-crt';
-          
+          'use strict';
           const
+            {SSMClient, GetParameterCommand} = require('@aws-sdk/client-ssm'),
+            {CrtSignerV4} = require('@aws-sdk/signature-v4-crt'),
             sigV4 = new CrtSignerV4({
               service: 'lambda',
               region: 'us-east-1',
@@ -30,15 +30,15 @@ Resources:
                 secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
                 sessionToken: process.env.AWS_SESSION_TOKEN
               }
-            }),
-            excludedHeaders = await getExcludedHeaders();   
+            });   
             
-          export async function handler(event, context, callback) {
+          exports.handler = async function(event, context, callback) {
             try {
               console.log('Request available: ' + JSON.stringify(event));  
           
               const
-                request = event.Records[0].cf.request,     
+                request = event.Records[0].cf.request,
+                excludedHeaders = await getExcludedHeaders(),
                 signed = await sigV4.sign(
                   {
                     method: request.method,
@@ -69,13 +69,17 @@ Resources:
               console.error(err);
               return callback(err);
             }
-          }
+          };
           
+          let excludedHeaders = null;
           async function getExcludedHeaders() {
-            const
-              client = new SSMClient({region: 'us-east-1'}),
-              {Parameter: {Value}} = await client.send(new GetParameterCommand({Name: '${app}-request-signer-excluded-headers'}));
-            return Value.split(',');
+            if (!excludedHeaders) {
+              const
+                client = new SSMClient({region: 'us-east-1'}),
+                {Parameter: {Value}} = await client.send(new GetParameterCommand({Name: '${app}-request-signer-excluded-headers'}));
+              excludedHeaders = Value.split(',');
+            }
+            return excludedHeaders;
           }
       FunctionName: !Sub "${app}-request-signer"
       Handler: index.handler

@@ -19,7 +19,7 @@ Resources:
       Code:
         ZipFile: |
           'use strict';
-          exports.handler = (event, context, callback) => {
+          exports.handler = function(event, context, callback) {
             try {          
               const request = event.Records[0].cf.request;
               console.log(`Request available: ${JSON.stringify(request)}`);

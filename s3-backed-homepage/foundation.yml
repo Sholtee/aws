@@ -118,7 +118,7 @@ Resources:
             {send, SUCCESS, FAILED} = require('cfn-response'),          
             {SSMClient, GetParameterCommand} = require('@aws-sdk/client-ssm');
 
-          exports.handler = async (event, context) => {
+          exports.handler = async function(event, context) {
             console.log('Getting global parameter...');
             try {          
               const
