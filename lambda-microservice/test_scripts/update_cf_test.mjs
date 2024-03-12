@@ -17,17 +17,47 @@ class CloudFrontConfig {
     this.config = config;
   }
 
-  addOrigin(id) {
-    this.config.Origins.Items.push({
-      ...this.config.Origins.Items.filter(origin => origin.Id === '404HandlerLambdaOrigin')[0],
-      Id: id
+  addOrigin(id, domainName) {
+    const {Origins} = this.config;
+    Origins.Items.push({
+      ...Origins.Items.filter(origin => origin.Id === '404HandlerLambdaOrigin')[0],
+      Id: id,
+      DomainName: domainName
     });
-    this.config.Origins.Quantity++;
+    Origins.Quantity++;
   }
 
   removeOrigin(id) {
-    this.config.Origins.Items = this.config.Origins.Items.filter(origin => origin.Id !== id);
-    this.config.Origins.Quantity = this.config.Origins.Items.length;
+    const {Origins} = this.config;
+    Origins.Items = Origins.Items.filter(origin => origin.Id !== id);
+    Origins.Quantity = Origins.Items.length;
+  }
+
+  addCacheBehavior(path, originId, allowedMethods) {
+    const
+      {CacheBehaviors, DefaultCacheBehavior} = this.config,
+      cachedMethods = allowedMethods.filter(m => ['HEAD', 'GET', 'OPTIONS'].indexOf(m) >= 0);
+    CacheBehaviors.Items = CacheBehaviors.Items || [];
+    CacheBehaviors.Items.push({
+      ...DefaultCacheBehavior,
+      PathPattern: path,
+      TargetOriginId: originId,
+      AllowedMethods: {
+        Quantity: allowedMethods.length,
+        Items: allowedMethods,
+        CachedMethods: {
+          Quantity: cachedMethods.length,
+          Items: cachedMethods
+        }
+      }
+    });
+    CacheBehaviors.Quantity++;
+  }
+
+  removeCacheBehavior(path) {
+    const {CacheBehaviors} = this.config;
+    CacheBehaviors.Items = CacheBehaviors.Items.filter(cb => cb.PathPattern !== path);
+    CacheBehaviors.Quantity = CacheBehaviors.Items.length;
   }
 
   update() {
@@ -37,11 +67,15 @@ class CloudFrontConfig {
     } finally {
       rmSync('./config.json', {force: true});
     }
+    execSync(`aws cloudfront wait distribution-deployed --id ${this.id}`);
   }
 }
 
-const config = new CloudFrontConfig('TESTTEST');
+const config = new CloudFrontConfig('TESTEST');
 
-//config.addOrigin('TestOrigin');
-config.removeOrigin('TestOrigin');
+config.addOrigin('TestOrigin', 'testest.lambda-url.eu-central-1.on.aws');
+config.addCacheBehavior('/', 'TestOrigin', ['GET', 'HEAD']);
+//config.removeOrigin('TestOrigin');
+//config.removeCacheBehavior('/');
+
 config.update();
