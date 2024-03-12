@@ -16,9 +16,9 @@ Parameters:
     MaxLength: '50'
     
 Resources:
-  ###################
+  #####################
   # 404 handler
-  ###################
+  #####################
  
   404HandlerLambda:
     Type: AWS::Lambda::Function
@@ -29,9 +29,8 @@ Resources:
           'use strict';
           exports.handler = function(event, context, callback) {
             try {
-              console.log(`Returning 404 for request: ${JSON.stringify(event)}`);
-            
-              callback(null, {
+              console.log(`Returning 404 for request: ${JSON.stringify(event)}`);        
+              return callback(null, {
                 statusCode: 404,
                 headers: {
                   'Content-Type': 'text/html'
@@ -54,7 +53,7 @@ Resources:
               return callback(err);
             }
           };
-      FunctionName: !Sub "${app}-404-handler"
+      FunctionName: !Sub "${app}-404-handler-lambda"
       Handler: index.handler
       Role: !GetAtt 404HandlerLambdaRole.Arn
       Runtime: nodejs18.x
@@ -97,9 +96,9 @@ Resources:
       Action: 'lambda:InvokeFunctionUrl'
       FunctionUrlAuthType: AWS_IAM
             
-  ###################
+  #####################
   # CloudFront
-  ###################
+  #####################
 
   CloudFrontDistro:
     Type: AWS::CloudFront::Distribution
@@ -130,9 +129,140 @@ Resources:
               LambdaFunctionARN: !GetAtt RequestSignerLambdaId.Value
               IncludeBody: true
 
-  ###################
+  #####################
+  # CloudFront updater
+  #####################
+
+  CloudFrontUpdaterFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: !Sub |
+          'use strict';
+          const
+            {send, SUCCESS, FAILED} = require('cfn-response'),
+            {CloudFrontClient, GetDistributionCommand, UpdateDistributionCommand} = require('@aws-sdk/client-cloudfront');
+
+          exports.handler = async function(event, context) {
+            console.log('Updating CloudFront distro: "${CloudFrontDistro}"');
+            try {          
+              const
+                client = new CloudFrontClient(),
+                {RequestType, ResourceProperties: {OriginId, LambdaDomain, Path, AllowedMethods}} = event,
+                {ETag, Distribution: {DistributionConfig}} = await client.send(new GetDistributionCommand({Id: '${CloudFrontDistro}'})),
+                {Origins, CacheBehaviors, DefaultCacheBehavior} = DistributionConfig;
+          
+              switch (RequestType) {
+                case 'Create':
+                  console.log('Creating new lambda association: ' + OriginId);
+                  const cachedMethods = AllowedMethods.filter(m => ['HEAD', 'GET', 'OPTIONS'].indexOf(m) >= 0);
+          
+                  Origins.Items.push({
+                    ...Origins.Items.filter(origin => origin.Id === '404HandlerLambdaOrigin')[0],
+                    Id: OriginId,
+                    DomainName: LambdaDomain
+                  });
+                  Origins.Quantity++;
+          
+                  CacheBehaviors.Items = CacheBehaviors.Items || [];
+                  CacheBehaviors.Items.push({
+                    ...DefaultCacheBehavior,
+                    PathPattern: Path,
+                    TargetOriginId: OriginId,
+                    AllowedMethods: {
+                      Quantity: AllowedMethods.length,
+                      Items: AllowedMethods,
+                      CachedMethods: {
+                        Quantity: cachedMethods.length,
+                        Items: cachedMethods
+                      }
+                    }
+                  });
+                  CacheBehaviors.Quantity++;
+      
+                  break;
+                case 'Delete':
+                  console.log('Removing lambda association: ' + OriginId);
+                  Origins.Items = Origins.Items.filter(origin => origin.Id !== OriginId);
+                  Origins.Quantity = Origins.Items.length;
+          
+                  CacheBehaviors.Items = CacheBehaviors.Items.filter(cb => cb.PathPattern !== Path);
+                  CacheBehaviors.Quantity = CacheBehaviors.Items.length;
+
+                  break;
+                case 'Update': throw 'Update NOT supported';
+              }
+
+              await client.send(new UpdateDistributionCommand({
+                Id: '${CloudFrontDistro}',
+                DistributionConfig,
+                IfMatch: ETag
+              }));
+          
+              do {
+                const {Distribution: {Status}} = await client.send(new GetDistributionCommand({Id: '${CloudFrontDistro}'}));
+                console.log(Status);
+                if (Status !== 'InProgress')
+                  break;
+                await new Promise(resolve => setTimeout(resolve, 2000));
+              } while(true);
+          
+              console.log('Update complete');
+              await send(event, context, SUCCESS, {});
+            } catch (err) {
+              console.error(err);
+              await send(event, context, FAILED, err);
+            }
+          };
+      Handler: index.handler
+      Runtime: nodejs18.x
+      FunctionName: !Sub "${app}-cloudfront-updater-lambda"
+      Role: !GetAtt CloudFrontUpdaterFunctionExecutionRole.Arn
+      MemorySize: 128
+      Timeout: 600
+
+  CloudFrontUpdaterFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: allowLambdaLogging
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:*"
+                Resource: "*"
+        - PolicyName: allowCloudFrontAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudfront:GetDistribution
+                  - cloudfront:UpdateDistribution
+                Resource: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistro}"
+        - PolicyName: allowLambdaAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:GetFunction
+                Resource: "*"
+
+  #####################
   # Global access
-  ###################        
+  #####################
       
   RequestSignerLambdaId:
     Type: AWS::CloudFormation::CustomResource
