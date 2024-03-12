@@ -28,9 +28,8 @@ Resources:
         ZipFile: |
           'use strict';
           exports.handler = function(event, context, callback) {
-            try {          
-              const request = event.Records[0].cf.request;
-              console.log(`Returning 404 for request: ${JSON.stringify(request)}`);
+            try {
+              console.log(`Returning 404 for request: ${JSON.stringify(event)}`);
             
               callback(null, {
                 statusCode: 404,
@@ -115,9 +114,13 @@ Resources:
               OriginProtocolPolicy: https-only
         DefaultCacheBehavior:
           AllowedMethods:
-            - 'GET'
             - 'HEAD'
+            - 'GET'
             - 'OPTIONS'
+            - 'PUT'
+            - 'PATCH'
+            - 'POST'
+            - 'DELETE'
           ViewerProtocolPolicy: redirect-to-https
           OriginRequestPolicyId: "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
           CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled

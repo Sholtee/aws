@@ -65,7 +65,9 @@ Resources:
                       .filter(([key]) => excludedHeaders.indexOf(key) < 0)
                       .map(([_, header]) => ({[header[0].key]: header[0].value}))
                       .reduce((accu, curr) => ({...accu, ...curr}), {}),
-                    body: request.body?.data
+                    body: request.body?.encoding === 'base64'
+                      ? Buffer.from(request.body.data, 'base64')
+                      : request.body?.data
                   },
                   {
                     signingRegion: /(?<urlid>\w+)\.lambda-url\.(?<region>[\w-]+)\.on\.aws/i

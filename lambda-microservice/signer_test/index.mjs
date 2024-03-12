@@ -41,7 +41,7 @@ const
         },
         path: '/',
         protocol: 'https',
-        body: null
+        body: Buffer.from('SGVsbG8sIHdvcmxkIQ==', 'base64')
       },
       {
         signingRegion: 'eu-west-2'
