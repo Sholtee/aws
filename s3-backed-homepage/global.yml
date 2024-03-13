@@ -8,7 +8,7 @@ Description: Global infrastructure. Needs to deployed in "us-east-1" region
 Parameters:
   app:
     Type: String
-    Description: The aplication name (including prefix)
+    Description: The application name (including prefix)
     MaxLength: '32'
 
 Resources:

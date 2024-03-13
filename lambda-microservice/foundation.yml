@@ -8,7 +8,7 @@ Description: Foundation infrastructure. Can be deployed in any region
 Parameters:
   app:
     Type: String
-    Description: The aplication name (including prefix)
+    Description: The application name (including prefix)
     MaxLength: '32'
   deploymentId:
     Type: String
@@ -93,7 +93,7 @@ Resources:
     Properties:
       FunctionName: !Ref 404HandlerLambda
       Principal: '*'
-      Action: 'lambda:InvokeFunctionUrl'
+      Action: lambda:InvokeFunctionUrl
       FunctionUrlAuthType: AWS_IAM
             
   #####################
@@ -148,7 +148,7 @@ Resources:
             try {          
               const
                 client = new CloudFrontClient(),
-                {RequestType, ResourceProperties: {OriginId, LambdaDomain, Path, AllowedMethods}} = event,
+                {RequestType, ResourceProperties: {OriginId, Domain, Path, AllowedMethods}} = event,
                 {ETag, Distribution: {DistributionConfig}} = await client.send(new GetDistributionCommand({Id: '${CloudFrontDistro}'})),
                 {Origins, CacheBehaviors, DefaultCacheBehavior} = DistributionConfig;
           
@@ -160,7 +160,7 @@ Resources:
                   Origins.Items.push({
                     ...Origins.Items.filter(origin => origin.Id === '404HandlerLambdaOrigin')[0],
                     Id: OriginId,
-                    DomainName: LambdaDomain
+                    DomainName: Domain
                   });
                   Origins.Quantity++;
           
@@ -332,3 +332,9 @@ Resources:
                 Action:
                   - ssm:GetParameter
                 Resource: '*'
+
+Outputs:
+  CloudFrontUpdaterFunctionArn:
+    Value: !GetAtt CloudFrontUpdaterFunction.Arn
+    Export:
+      Name: !Sub "${app}-cloudfront-updater-lambda-arn"
