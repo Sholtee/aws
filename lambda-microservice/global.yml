@@ -44,18 +44,24 @@ Resources:
             {SSMClient, GetParameterCommand} = require('@aws-sdk/client-ssm'),
             {SignatureV4} = require('@aws-sdk/signature-v4'),
             {createHash, createHmac} = require('crypto'),
-          
+
+            ssmClient = new SSMClient({region: 'us-east-1'}),
             sigV4 = new SignatureV4({
               service: 'lambda',
               region: 'us-east-1',
-              credentials: {
-                accessKeyId: '${RequestSignerUserAccessKey}',
-                secretAccessKey: '${RequestSignerUserAccessKey.SecretAccessKey}'
+              credentials: async function() {
+                return {
+                  accessKeyId: await getParameter('${app}-request-signer-user-access-key'),
+                  secretAccessKey: await getParameter('${app}-request-signer-user-secret')
+                };       
               },
               sha256: function Sha256(secret) {
                 return secret ? createHmac('sha256', secret) : createHash('sha256');
               }
-            });
+            }),
+            excludedHeaders = (async function() {
+              return (await getParameter('${app}-request-signer-excluded-headers')).split(',');
+            })();
             
           exports.handler = async function(event, context, callback) {
             try {
@@ -64,7 +70,7 @@ Resources:
       
               const
                 request = event.Records[0].cf.request,
-                excludedHeaders = await getExcludedHeaders(),
+                eh = await excludedHeaders,
                 signed = await sigV4.sign(
                   {
                     hostname: request.headers.host[0].value,
@@ -74,7 +80,7 @@ Resources:
                     // query: ...,
                     headers: Object
                       .entries(request.headers)
-                      .filter(([key]) => excludedHeaders.indexOf(key) < 0)
+                      .filter(([key]) => eh.indexOf(key) < 0)
                       .map(([_, header]) => ({[header[0].key]: header[0].value}))
                       .reduce((accu, curr) => ({...accu, ...curr}), {}),
                     body: request.body?.data && request.body.encoding === 'base64'
@@ -103,15 +109,8 @@ Resources:
             }
           };
           
-          let excludedHeaders = null;
-          async function getExcludedHeaders() {
-            if (!excludedHeaders) {
-              const
-                client = new SSMClient({region: 'us-east-1'}),
-                {Parameter: {Value}} = await client.send(new GetParameterCommand({Name: '${app}-request-signer-excluded-headers'}));
-              excludedHeaders = Value.split(',');
-            }
-            return excludedHeaders;
+          async function getParameter(name) {
+            return (await ssmClient.send(new GetParameterCommand({Name: name}))).Parameter.Value;
           }
       FunctionName: !Sub "${app}-request-signer"
       Handler: index.handler
@@ -169,8 +168,7 @@ Resources:
                 - iam:CreateServiceLinkedRole
                 - cloudfront:UpdateDistribution
               Resource: '*'
-  
-        
+
   RequestSignerExcludedHeaders:
     Type: AWS::SSM::Parameter
     Properties:
@@ -193,4 +191,18 @@ Resources:
       Description: Request signer user ARN. Resources from other regions can use this parameter. It requires as cross region export/import is not allowed
       Name: !Sub "${app}-request-signer-user-arn"
       Value: !GetAtt RequestSignerUser.Arn
+      Type: String
+
+  RequestSignerUserKey:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "${app}-request-signer-user-access-key"
+      Value: !Ref RequestSignerUserAccessKey
+      Type: String
+
+  RequestSignerUserSecret:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "${app}-request-signer-user-secret"
+      Value: !GetAtt RequestSignerUserAccessKey.SecretAccessKey
       Type: String
