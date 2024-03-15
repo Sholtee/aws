@@ -12,6 +12,27 @@ Parameters:
     MaxLength: '32'
 
 Resources:
+  RequestSignerUser:
+    Type: AWS::IAM::User
+    Description: CloudFront user to sign the incoming requests
+    Properties:
+      UserName: !Sub "${app}-request-signer"
+      Path: "/"
+      Policies:
+        - PolicyName: allowLambdaUrlInvocation
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunctionUrl
+                Resource: "*"
+
+  RequestSignerUserAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref RequestSignerUser
+
   RequestSignerLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -28,9 +49,8 @@ Resources:
               service: 'lambda',
               region: 'us-east-1',
               credentials: {
-                accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-                secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-                sessionToken: process.env.AWS_SESSION_TOKEN
+                accessKeyId: '${RequestSignerUserAccessKey}',
+                secretAccessKey: '${RequestSignerUserAccessKey.SecretAccessKey}'
               },
               sha256: function Sha256(secret) {
                 return secret ? createHmac('sha256', secret) : createHash('sha256');
@@ -159,10 +179,18 @@ Resources:
       Value: x-forwarded-for,te
       Type: String
   
-  RequestSignerLambdaId:
+  RequestSignerLambdaArn:
     Type: AWS::SSM::Parameter
     Properties:
-      Description: Lambda ID. Resources from other regions can use this parameter. It requires as cross region export/import is not allowed (03.09.2024)
-      Name: !Sub "${app}-request-signer-lambda-id"
+      Description: Request signer lambda ARN. Resources from other regions can use this parameter. It requires as cross region export/import is not allowed
+      Name: !Sub "${app}-request-signer-lambda-arn"
       Value: !Ref RequestSignerLambdaVersion
+      Type: String
+
+  RequestSignerUserArn:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Request signer user ARN. Resources from other regions can use this parameter. It requires as cross region export/import is not allowed
+      Name: !Sub "${app}-request-signer-user-arn"
+      Value: !GetAtt RequestSignerUser.Arn
       Type: String

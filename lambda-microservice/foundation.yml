@@ -92,7 +92,7 @@ Resources:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref 404HandlerLambda
-      Principal: '*'
+      Principal: !GetAtt RequestSignerUserArn.Value
       Action: lambda:InvokeFunctionUrl
       FunctionUrlAuthType: AWS_IAM
             
@@ -126,7 +126,7 @@ Resources:
           TargetOriginId: 404HandlerLambdaOrigin
           LambdaFunctionAssociations:
             - EventType: origin-request
-              LambdaFunctionARN: !GetAtt RequestSignerLambdaId.Value
+              LambdaFunctionARN: !GetAtt RequestSignerLambdaArn.Value
               IncludeBody: true
 
   #####################
@@ -264,11 +264,18 @@ Resources:
   # Global access
   #####################
       
-  RequestSignerLambdaId:
+  RequestSignerLambdaArn:
     Type: AWS::CloudFormation::CustomResource
     Properties:
       DeploymentId: !Ref deploymentId
-      Parameter: !Sub "${app}-request-signer-lambda-id"
+      Parameter: !Sub "${app}-request-signer-lambda-arn"
+      ServiceToken: !GetAtt FetchGlobalParameterFunction.Arn
+
+  RequestSignerUserArn:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      DeploymentId: !Ref deploymentId
+      Parameter: !Sub "${app}-request-signer-user-arn"
       ServiceToken: !GetAtt FetchGlobalParameterFunction.Arn
 
   FetchGlobalParameterFunction:
@@ -338,3 +345,7 @@ Outputs:
     Value: !GetAtt CloudFrontUpdaterFunction.Arn
     Export:
       Name: !Sub "${app}-cloudfront-updater-lambda-arn"
+  RequestSignerUserArn:
+    Value: !GetAtt RequestSignerUserArn.Value
+    Export:
+      Name: !Sub "${app}-request-signer-user-arn"

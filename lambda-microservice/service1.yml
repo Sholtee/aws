@@ -75,7 +75,8 @@ Resources:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref RequestHandlerLambda
-      Principal: '*'
+      Principal:
+        Fn::ImportValue: !Sub "${app}-request-signer-user-arn"
       Action: 'lambda:InvokeFunctionUrl'
       FunctionUrlAuthType: AWS_IAM
 
