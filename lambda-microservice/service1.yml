@@ -20,22 +20,9 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:     
       Code:
-        ZipFile: |
-          'use strict';
-          exports.handler = function(event, context, callback) {
-            try {      
-              return callback(null, {
-                statusCode: 200,
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify('Hello World!')
-              });         
-            } catch (err) {
-              console.error(err);
-              return callback(err);
-            }
-          };
+        S3Bucket:
+          Fn::ImportValue: !Sub "${app}-services-bucket-name"
+        S3Key: !Sub "${app}-service1.zip"
       FunctionName: !Sub "${app}-request-handler-lambda"
       Handler: index.handler
       Role: !GetAtt RequestHandlerLambdaRole.Arn

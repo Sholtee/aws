@@ -25,6 +25,18 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+Start-Process -FilePath npm -ArgumentList install -WorkingDirectory .\${service} -NoNewWindow
+
+Compress-Archive -Path .\${service}\* -DestinationPath .\${service}.zip
+try
+{
+  aws s3 cp .\${service}.zip "s3://${app}-services-bucket/${app}-${service}.zip" --profile ${profile}
+}
+finally
+{
+  Remove-Item -Path .\${service}.zip -Force
+}
+
 aws cloudformation ${action}-stack `
   --profile ${profile} `
   --stack-name "${app}-${service}" `

@@ -340,6 +340,19 @@ Resources:
                   - ssm:GetParameter
                 Resource: '*'
 
+  #####################
+  # Services bucket
+  #####################
+
+  ServicesBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: !Sub "${app}-services-bucket"
+
+#####################
+# Outputs
+#####################
+
 Outputs:
   CloudFrontUpdaterFunctionArn:
     Value: !GetAtt CloudFrontUpdaterFunction.Arn
@@ -349,3 +362,7 @@ Outputs:
     Value: !GetAtt RequestSignerUserArn.Value
     Export:
       Name: !Sub "${app}-request-signer-user-arn"
+  ServicesBucketName:
+    Value: !Ref ServicesBucket
+    Export:
+      Name: !Sub "${app}-services-bucket-name"
