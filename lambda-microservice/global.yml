@@ -22,21 +22,9 @@ Resources:
           const
             {SSMClient, GetParameterCommand} = require('@aws-sdk/client-ssm'),
             {SignatureV4} = require('@aws-sdk/signature-v4'),
-            {createHash, createHmac} = require('crypto');
-            
-          class Sha256 {
-            constructor(secret) {
-              this.hash = secret ? createHmac('sha256', secret) : createHash('sha256');
-            }
-            update(array) {
-              this.hash.update(array);
-            }
-            digest() {
-              return Promise.resolve(new Uint8Array(this.hash.digest().buffer));
-            }
-          } 
-            
-          const sigV4 = new SignatureV4({
+            {createHash, createHmac} = require('crypto'),
+          
+            sigV4 = new SignatureV4({
               service: 'lambda',
               region: 'us-east-1',
               credentials: {
@@ -44,8 +32,10 @@ Resources:
                 secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
                 sessionToken: process.env.AWS_SESSION_TOKEN
               },
-              sha256: Sha256
-            });   
+              sha256: function Sha256(secret) {
+                return secret ? createHmac('sha256', secret) : createHash('sha256');
+              }
+            });
             
           exports.handler = async function(event, context, callback) {
             try {
@@ -56,8 +46,9 @@ Resources:
                 excludedHeaders = await getExcludedHeaders(),
                 signed = await sigV4.sign(
                   {
+                    hostname: request.headers.host[0].value,
                     method: request.method,
-                    protocol: 'https',
+                    protocol: 'https:',
                     path: request.uri,
                     // query: ...,
                     headers: Object
@@ -65,8 +56,8 @@ Resources:
                       .filter(([key]) => excludedHeaders.indexOf(key) < 0)
                       .map(([_, header]) => ({[header[0].key]: header[0].value}))
                       .reduce((accu, curr) => ({...accu, ...curr}), {}),
-                    body: request.body?.encoding === 'base64'
-                      ? Buffer.from(request.body.data, 'base64')
+                    body: request.body?.data && request.body.encoding === 'base64'
+                      ? Buffer.from(request.body.data, request.body.encoding)
                       : request.body?.data
                   },
                   {

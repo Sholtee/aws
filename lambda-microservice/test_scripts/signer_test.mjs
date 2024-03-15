@@ -8,47 +8,41 @@ import {defaultProvider} from '@aws-sdk/credential-provider-node';
 import {SignatureV4} from '@aws-sdk/signature-v4';
 import {createHash, createHmac} from 'crypto';
 
-class Sha256 {
-  constructor(secret) {
-    this.hash = secret
-      ? createHmac('sha256', secret)
-      : createHash('sha256');
-  }
-  update(array) {
-    this.hash.update(array);
-  }
-  digest() {
-    return Promise.resolve(new Uint8Array(this.hash.digest().buffer));
-  }
-}
-
 const
-  {accessKeyId, secretAccessKey, sessionToken} = await defaultProvider()(),
   sigV4 = new SignatureV4({
     service: 'lambda',
     region: 'us-east-1',
-    credentials: {accessKeyId, secretAccessKey, sessionToken},
-    sha256: Sha256
+    credentials: defaultProvider(),
+    sha256: function Sha256(secret) {
+      return secret ? createHmac('sha256', secret) : createHash('sha256')
+    }
   });
 
-(async function main() {
+(async function main(endpoint) {
   try {
     const signed = await sigV4.sign(
       {
-        method: 'POST',
-        headers: {
-          Host: 'test1234test4321.lambda-url.eu-west-2.on.aws'
-        },
+        hostname: endpoint,
         path: '/',
-        protocol: 'https',
-        body: Buffer.from('SGVsbG8sIHdvcmxkIQ==', 'base64')
+        protocol: 'https:',
+        method: 'POST',
+        body: JSON.stringify('hello'),
+        headers: {
+            host: endpoint,
+            'Content-Type': 'application/json',
+        }
       },
       {
-        signingRegion: 'eu-west-2'
+        signingRegion: 'eu-central-1'
       }
     );
+
     console.log(JSON.stringify(signed));
+
+    const ret = await fetch(`https://${signed.hostname}${signed.path}`, signed);
+
+    console.log(await ret.text());
   } catch (err) {
     console.log(err);
   }
-})();
+})('testestest1234567890.lambda-url.eu-central-1.on.aws');
