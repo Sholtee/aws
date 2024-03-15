@@ -39,8 +39,9 @@ Resources:
             
           exports.handler = async function(event, context, callback) {
             try {
-              console.log('Request available: ' + JSON.stringify(event));  
-          
+              console.log('Lambda context: ' + JSON.stringify(context));
+              console.log('Request available: ' + JSON.stringify(event));
+      
               const
                 request = event.Records[0].cf.request,
                 excludedHeaders = await getExcludedHeaders(),
