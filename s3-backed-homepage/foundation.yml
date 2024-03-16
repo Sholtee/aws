@@ -22,7 +22,6 @@ Resources:
 
   FrontendBucket:
     Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
     Properties:
       BucketName: !Sub "${app}-frontend"
       VersioningConfiguration:
