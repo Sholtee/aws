@@ -31,9 +31,9 @@ try {
 }
 
 Write-Host `nInvalidating CloudFront distribution:
-foreach ($distro in (aws cloudfront list-distributions --profile ${profile} | ConvertFrom-Json).DistributionList.Items) {
-  if ($distro.Origins.Items | Where {$_.DomainName -Eq "${app}-frontend.s3.amazonaws.com" | Select -First 1 }) {
-    Write-Host $distro.Id
-    aws cloudfront create-invalidation --distribution-id $distro.Id --paths "/*" --profile ${profile} | Out-Null
+(aws cloudfront list-distributions --profile ${profile} | ConvertFrom-Json).DistributionList.Items | ForEach-Object {
+  if ($_.Origins.Items | Where {$_.DomainName -Eq "${app}-frontend.s3.amazonaws.com" | Select -First 1 }) {
+    Write-Host $_.Id
+    aws cloudfront create-invalidation --distribution-id $_.Id --paths "/*" --profile ${profile} | Out-Null
   }
 }
