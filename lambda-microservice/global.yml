@@ -45,10 +45,10 @@ Resources:
             {SignatureV4} = require('@aws-sdk/signature-v4'),
             {createHash, createHmac} = require('crypto'),
 
-            ssmClient = new SSMClient({region: 'us-east-1'}),
+            ssmClient = new SSMClient({region: '${AWS::Region}'}),
             sigV4 = new SignatureV4({
               service: 'lambda',
-              region: 'us-east-1',
+              region: '${AWS::Region}',
               credentials: async function() {
                 return {
                   accessKeyId: await getParameter('${app}-request-signer-user-access-key'),
@@ -174,7 +174,7 @@ Resources:
   RequestSignerExcludedHeaders:
     Type: AWS::SSM::Parameter
     Properties:
-      Description: Headers to be excluded when signing the request. Must be store as a parameter as Lambda@Edge cannot have environment variable defined
+      Description: Headers to be excluded when signing the request. Must be store as a parameter as Lambda@Edge cannot have environment variables defined
       Name: !Sub "${app}-request-signer-excluded-headers"
       Value: x-forwarded-for,te
       Type: String
