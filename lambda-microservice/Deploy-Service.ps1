@@ -25,22 +25,32 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-Start-Process -FilePath npm -ArgumentList install -WorkingDirectory .\${service} -NoNewWindow
-
-Compress-Archive -Path .\${service}\* -DestinationPath .\${service}.zip
-try
-{
-  aws s3 cp .\${service}.zip "s3://${app}-services-bucket/${app}-${service}.zip" --profile ${profile}
-}
-finally
-{
-  Remove-Item -Path .\${service}.zip -Force
-}
+$functionName = "${app}-${service}-lambda"
 
 aws cloudformation ${action}-stack `
   --profile ${profile} `
   --stack-name "${app}-${service}" `
   --region ${region} `
   --template-body "file://./${service}.yml" `
-  --parameters "ParameterKey=app,ParameterValue=${app}" `
+  --parameters "ParameterKey=app,ParameterValue=${app}" "ParameterKey=functionName,ParameterValue=${functionName}" `
   --capabilities CAPABILITY_NAMED_IAM
+
+aws cloudformation wait stack-create-complete --region ${region} --stack-name "${app}-${service}"
+
+Start-Process -FilePath npm -ArgumentList install -WorkingDirectory .\${service} -NoNewWindow -Wait
+
+Compress-Archive -Path .\${service}\* -DestinationPath .\${service}.zip
+try
+{
+  aws lambda update-function-code `
+    --profile ${profile} `
+    --function-name ${functionName} `
+    --zip-file "fileb://./${service}.zip" `
+    --no-cli-pager
+}
+finally
+{
+  Remove-Item -Path .\${service}.zip -Force
+}
+
+aws lambda wait function-updated --profile ${profile} --function-name ${functionName}

@@ -10,6 +10,9 @@ Parameters:
     Type: String
     Description: The application name (including prefix)
     MaxLength: '32'
+  functionName:
+    Type: String
+    Description: The lambda function name
     
 Resources:
   #####################
@@ -20,16 +23,28 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:     
       Code:
-        S3Bucket:
-          Fn::ImportValue: !Sub "${app}-services-bucket-name"
-        S3Key: !Sub "${app}-service1.zip"
-      FunctionName: !Sub "${app}-request-handler-lambda"
+         ZipFile: // placeholder
+      FunctionName: !Ref functionName
       Handler: index.handler
       Role: !GetAtt RequestHandlerLambdaRole.Arn
       Runtime: nodejs18.x
       Timeout: 10
       MemorySize: 128
-      
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref RequestHandlerLambdaSecurityGroup
+        SubnetIds:
+          - Fn::ImportValue: !Sub "${app}-vpc-subnet-1-id"
+          - Fn::ImportValue: !Sub "${app}-vpc-subnet-2-id"
+      Environment:
+        Variables:
+          DB_NAME:
+            Fn::ImportValue: !Sub "${app}-db-name"
+          DB_ENDPOINT:
+            Fn::ImportValue: !Sub "${app}-db-endpoint"
+          DB_SECRET_ARN:
+            Fn::ImportValue: !Sub "${app}-db-secret-arn"
+
   RequestHandlerLambdaUrl:
     Type: "AWS::Lambda::Url"
     Properties:
@@ -48,6 +63,8 @@ Resources:
             Principal:
               Service:
                 - "lambda.amazonaws.com"
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
       Policies:
         - PolicyName: allowLambdaLogging
           PolicyDocument:
@@ -57,6 +74,15 @@ Resources:
                 Action:
                   - "logs:*"
                 Resource: "*"
+        - PolicyName: allowSecretManagerAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  Fn::ImportValue: !Sub "${app}-db-secret-arn"
 
   RequestHandlerLambdaPermission:
     Type: AWS::Lambda::Permission
@@ -83,3 +109,13 @@ Resources:
         - OPTIONS
       ServiceToken:
         Fn::ImportValue: !Sub "${app}-cloudfront-updater-lambda-arn"
+
+  RequestHandlerLambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Lambda SG
+      VpcId:
+        Fn::ImportValue: !Sub "${app}-vpc-id"
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: "0.0.0.0/0"

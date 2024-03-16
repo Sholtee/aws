@@ -349,15 +349,6 @@ Resources:
                   - ssm:GetParameter
                 Resource: '*'
 
-  #####################
-  # Services bucket
-  #####################
-
-  ServicesBucket:
-    Type: "AWS::S3::Bucket"
-    Properties:
-      BucketName: !Sub "${app}-services-bucket"
-
   ###################
   # VPC
   ###################
@@ -535,6 +526,10 @@ Outputs:
     Value: !GetAtt CloudFrontUpdaterFunction.Arn
     Export:
       Name: !Sub "${app}-cloudfront-updater-lambda-arn"
+  DbName:
+    Value: !Ref dbName
+    Export:
+      Name: !Sub "${app}-db-name"
   DbEndpoint:
     Value: !GetAtt DbCluster.Endpoint.Address
     Export:
@@ -555,10 +550,14 @@ Outputs:
     Value: !GetAtt RequestSignerUserArn.Value
     Export:
       Name: !Sub "${app}-request-signer-user-arn"
-  ServicesBucketName:
-    Value: !Ref ServicesBucket
+  Subnet1Id:
+    Value: !Ref VpcPrivateSubnet1
     Export:
-      Name: !Sub "${app}-services-bucket-name"
+      Name: !Sub "${app}-vpc-subnet-1-id"
+  Subnet2Id:
+    Value: !Ref VpcPrivateSubnet2
+    Export:
+      Name: !Sub "${app}-vpc-subnet-2-id"
   VpcId:
     Value: !Ref Vpc
     Export:
