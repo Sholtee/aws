@@ -10,6 +10,11 @@ Parameters:
     Type: String
     Description: The application name (including prefix)
     MaxLength: '32'
+  dbName:
+    Type: String
+    Description: Name of the application database
+    MaxLength: '32'
+    Default: AppDb
   deploymentId:
     Type: String
     Description: The unique deployment id. Must be changed in each deployment
@@ -107,19 +112,23 @@ Resources:
         Enabled: true
         HttpVersion: http2
         Origins:
-          - DomainName: !Select [2, !Split ["/", !GetAtt 404HandlerLambdaUrl.FunctionUrl]]
+          - DomainName: !Select
+            - 2
+            - !Split
+              - /
+              - !GetAtt 404HandlerLambdaUrl.FunctionUrl
             Id: '404HandlerLambdaOrigin'
             CustomOriginConfig:
               OriginProtocolPolicy: https-only
         DefaultCacheBehavior:
           AllowedMethods:
-            - 'HEAD'
-            - 'GET'
-            - 'OPTIONS'
-            - 'PUT'
-            - 'PATCH'
-            - 'POST'
-            - 'DELETE'
+            - HEAD
+            - GET
+            - OPTIONS
+            - PUT
+            - PATCH
+            - POST
+            - DELETE
           ViewerProtocolPolicy: redirect-to-https
           OriginRequestPolicyId: "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
           CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
@@ -349,6 +358,174 @@ Resources:
     Properties:
       BucketName: !Sub "${app}-services-bucket"
 
+  ###################
+  # VPC
+  ###################
+
+  Vpc:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: 192.168.0.0/16
+      InstanceTenancy: default
+
+  VpcPrivateSubnet1:
+      Type: "AWS::EC2::Subnet"
+      Properties:
+        VpcId: !Ref Vpc
+        CidrBlock: 192.168.10.0/24
+        AvailabilityZone: !Select
+          - 0
+          - Fn::GetAZs: !Ref "AWS::Region"
+
+  VpcPrivateSubnet1RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref VpcNatRouteTable
+      SubnetId: !Ref VpcPrivateSubnet1
+
+  VpcPrivateSubnet2:  # AWS::RDS::DBSubnetGroup requires at least 2 subnets
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 192.168.20.0/24
+      AvailabilityZone: !Select
+        - 1
+        - Fn::GetAZs: !Ref "AWS::Region"
+
+  VpcPrivateSubnet2RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref VpcNatRouteTable
+      SubnetId: !Ref VpcPrivateSubnet2
+
+  VpcPublicSubnet:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 192.168.30.0/24
+
+  VpcPublicSubnetRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref VpcInternetRouteTable
+      SubnetId: !Ref VpcPublicSubnet
+
+  VpcInternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+
+  VpcInternetGatewayAttachment:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      VpcId: !Ref "Vpc"
+      InternetGatewayId: !Ref "VpcInternetGateway"
+
+  VpcInternetRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref "Vpc"
+
+  VpcInternetRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref "VpcInternetGateway"
+      RouteTableId: !Ref "VpcInternetRouteTable"
+
+  VpcNatElasticIP:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: "vpc"
+
+  VpcNatGateway:
+    Type: "AWS::EC2::NatGateway"
+    Properties:
+      AllocationId: !GetAtt "VpcNatElasticIP.AllocationId"
+      SubnetId: !Ref "VpcPublicSubnet"
+
+  VpcNatRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref "Vpc"
+
+  VpcNatRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref VpcNatGateway
+      RouteTableId: !Ref VpcNatRouteTable
+
+  ###################
+  # DB
+  ###################
+
+  DbCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      DBClusterIdentifier: !Sub "${app}-db-cluster"
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      Engine: aurora-mysql
+      EngineVersion: 8.0.mysql_aurora.3.06.0
+      MasterUsername: !Sub '{{resolve:secretsmanager:${DbSecret}:SecretString:username}}'
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DbSecret}:SecretString:password}}'
+      DatabaseName: !Ref dbName
+      EnableHttpEndpoint: true  # Set to false if you don't need the AWS's Query Editor
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: 0.5
+        MaxCapacity: 1
+      VpcSecurityGroupIds:
+        - !Ref DbVpcSecurityGroup
+
+  DbInstance1:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBClusterIdentifier: !Ref DbCluster
+      DBInstanceIdentifier: !Sub "${app}-db-instance1"
+      DBInstanceClass: db.serverless
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      Engine: aurora-mysql
+      EngineVersion: 8.0.mysql_aurora.3.06.0
+      PubliclyAccessible: false
+
+  DbInstance2:   # we need at least 2 instances, a reader and a writer
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBClusterIdentifier: !Ref DbCluster
+      DBInstanceIdentifier: !Sub "${app}-db-instance2"
+      DBInstanceClass: db.serverless
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      Engine: aurora-mysql
+      EngineVersion: 8.0.mysql_aurora.3.06.0
+      PubliclyAccessible: false
+
+  DbSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${app}-db-secret"
+      GenerateSecretString:
+        SecretStringTemplate: !Sub '{"username": "root"}'
+        GenerateStringKey: "password"
+        ExcludePunctuation: true
+        PasswordLength: 16
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Db subnet group
+      SubnetIds:
+        - !Ref VpcPrivateSubnet1
+        - !Ref VpcPrivateSubnet2
+
+  DbVpcSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: DB cluster VPC security group
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: 0.0.0.0/0
+
 #####################
 # Outputs
 #####################
@@ -358,6 +535,22 @@ Outputs:
     Value: !GetAtt CloudFrontUpdaterFunction.Arn
     Export:
       Name: !Sub "${app}-cloudfront-updater-lambda-arn"
+  DbEndpoint:
+    Value: !GetAtt DbCluster.Endpoint.Address
+    Export:
+      Name: !Sub "${app}-db-endpoint"
+  DbReaderEndpoint:
+    Value: !GetAtt DbCluster.ReadEndpoint.Address
+    Export:
+      Name: !Sub "${app}-db-reader-endpoint"
+  DbPort:
+    Value: !GetAtt DbCluster.Endpoint.Port
+    Export:
+      Name: !Sub "${app}-db-port"
+  DbSecretArn:
+    Value: !Ref DbSecret
+    Export:
+      Name: !Sub "${app}-db-secret-arn"
   RequestSignerUserArn:
     Value: !GetAtt RequestSignerUserArn.Value
     Export:
@@ -366,3 +559,7 @@ Outputs:
     Value: !Ref ServicesBucket
     Export:
       Name: !Sub "${app}-services-bucket-name"
+  VpcId:
+    Value: !Ref Vpc
+    Export:
+      Name: !Sub "${app}-vpc-id"

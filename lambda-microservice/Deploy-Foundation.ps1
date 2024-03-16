@@ -3,7 +3,7 @@
 #
 # Author: Denes Solti
 #
-# Usage: Deploy-Foundation.ps1 -action [create|update] -app appName -region regionName -profile profileName
+# Usage: Deploy-Foundation.ps1 -action [create|update] -config foundtation.json -region region-name -profile profile-name
 #
 
 param(
@@ -11,7 +11,7 @@ param(
   [string]$action,
 
   [Parameter(Position=1, Mandatory=$true)]
-  [string]$app,
+  [string]$config,
 
   [Parameter(Position=2, Mandatory=$true)]
   [string]$region,
@@ -22,10 +22,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-aws cloudformation ${action}-stack `
-  --profile ${profile} `
-  --stack-name ${app}-foundation `
-  --region ${region} `
-  --template-body file://./foundation.yml `
-  --parameters "ParameterKey=app,ParameterValue=${app}"  "ParameterKey=deploymentId,ParameterValue=$(New-Guid)" `
-  --capabilities CAPABILITY_NAMED_IAM
+$configJson = Get-Content $config -Raw | ConvertFrom-Json | Select-Object *, @{
+  Name = 'deploymentId'
+  Expression = { New-Guid }
+}
+
+$configJson.PSObject.Properties | ForEach-Object -Begin {$params=''} -Process {
+  $params += "`"ParameterKey=$($_.Name),ParameterValue=$($_.Value)`" "
+}
+
+Invoke-Expression "aws cloudformation ${action}-stack --profile ${profile} --stack-name $($configJson.app)-foundation --region ${region} --template-body file://./foundation.yml --parameters ${params} --capabilities CAPABILITY_NAMED_IAM"

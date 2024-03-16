@@ -71,11 +71,15 @@ Resources:
     Type: AWS::CloudFormation::CustomResource
     Properties:
       OriginId: RequestHandlerOrigin
-      Domain: !Select [2, !Split ["/", !GetAtt RequestHandlerLambdaUrl.FunctionUrl]]
-      Path: "/"
+      Domain: !Select
+        - 2
+        - !Split
+          - /
+          - !GetAtt RequestHandlerLambdaUrl.FunctionUrl
+      Path: /
       AllowedMethods:
-        - 'HEAD'
-        - 'GET'
-        - 'OPTIONS'
+        - HEAD
+        - GET
+        - OPTIONS
       ServiceToken:
         Fn::ImportValue: !Sub "${app}-cloudfront-updater-lambda-arn"

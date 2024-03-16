@@ -3,7 +3,7 @@
 #
 # Author: Denes Solti
 #
-# Usage: Deploy-Service.ps1 -action [create|update] -app appName -service serviceName -profile profileName -region region
+# Usage: Deploy-Service.ps1 -action [create|update] -app app-name -service service-name -profile profile-name -region region-name
 #
 
 param(

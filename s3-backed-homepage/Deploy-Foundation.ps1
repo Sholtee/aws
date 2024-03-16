@@ -3,7 +3,7 @@
 #
 # Author: Denes Solti
 #
-# Usage: Deploy-Foundation.ps1 -action [create|update] -app appName -region regionName -profile profileName
+# Usage: Deploy-Foundation.ps1 -action [create|update] -app app-name -region region-name -profile profile-name
 #
 
 param(

@@ -3,7 +3,7 @@
 #
 # Author: Denes Solti
 #
-# Usage: Deploy-Global.ps1 -action [create|update] -app appName -profile profileName
+# Usage: Deploy-Global.ps1 -action [create|update] -app app-name -profile profile-name
 #
 
 param(
