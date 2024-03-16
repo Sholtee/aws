@@ -3,7 +3,7 @@
 #
 # Author: Denes Solti
 #####################################################
-Description: Global infrastructure. Needs to deployed in "us-east-1" region
+Description: Global infrastructure. Needs to be deployed to "us-east-1" region
 
 Parameters:
   app:
