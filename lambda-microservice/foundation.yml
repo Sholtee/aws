@@ -468,7 +468,7 @@ Resources:
       MasterUsername: !Sub '{{resolve:secretsmanager:${DbSecret}:SecretString:username}}'
       MasterUserPassword: !Sub '{{resolve:secretsmanager:${DbSecret}:SecretString:password}}'
       DatabaseName: !Ref dbName
-      EnableHttpEndpoint: true  # Set to false if you don't need the AWS's Query Editor
+      EnableHttpEndpoint: false
       ServerlessV2ScalingConfiguration:
         MinCapacity: 0.5
         MaxCapacity: 1

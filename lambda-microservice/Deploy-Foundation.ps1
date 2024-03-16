@@ -31,4 +31,10 @@ $configJson.PSObject.Properties | ForEach-Object -Begin {$params=''} -Process {
   $params += "`"ParameterKey=$($_.Name),ParameterValue=$($_.Value)`" "
 }
 
-Invoke-Expression "aws cloudformation ${action}-stack --profile ${profile} --stack-name $($configJson.app)-foundation --region ${region} --template-body file://./foundation.yml --parameters ${params} --capabilities CAPABILITY_NAMED_IAM"
+Invoke-Expression ("aws cloudformation ${action}-stack " +
+  "--profile ${profile} "                                +
+  "--stack-name $($configJson.app)-foundation "          +
+  "--region ${region} "                                  +
+  "--template-body file://./foundation.yml "             +
+  "--parameters ${params} "                              +
+  "--capabilities CAPABILITY_NAMED_IAM")
