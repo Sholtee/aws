@@ -55,7 +55,7 @@ Resources:
                   secretAccessKey: await getParameter('${app}-request-signer-user-secret')
                 };       
               },
-              sha256: function Sha256(secret) {
+              sha256: function(secret) {
                 return secret ? createHmac('sha256', secret) : createHash('sha256');
               }
             }),
@@ -110,7 +110,9 @@ Resources:
           };
           
           async function getParameter(name) {
-            return (await ssmClient.send(new GetParameterCommand({Name: name}))).Parameter.Value;
+            return (await ssmClient.send(new GetParameterCommand({Name: name})))
+              .Parameter
+              .Value;
           }
       FunctionName: !Sub "${app}-request-signer"
       Handler: index.handler
@@ -172,7 +174,7 @@ Resources:
   RequestSignerExcludedHeaders:
     Type: AWS::SSM::Parameter
     Properties:
-      Description: Headers to be excluded when signing the request
+      Description: Headers to be excluded when signing the request. Must be store as a parameter as Lambda@Edge cannot have environment variable defined
       Name: !Sub "${app}-request-signer-excluded-headers"
       Value: x-forwarded-for,te
       Type: String
