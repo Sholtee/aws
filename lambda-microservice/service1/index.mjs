@@ -1,3 +1,8 @@
+/****************************************************
+ * index.mjs
+ *
+ * Author: Denes Solti
+ *****************************************************/
 'use strict';
 import {GetSecretValueCommand, SecretsManagerClient} from '@aws-sdk/client-secrets-manager';
 import {createPool} from 'mysql2/promise';
