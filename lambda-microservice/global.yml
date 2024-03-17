@@ -44,6 +44,7 @@ Resources:
             {SSMClient, GetParameterCommand} = require('@aws-sdk/client-ssm'),
             {SignatureV4} = require('@aws-sdk/signature-v4'),
             {createHash, createHmac} = require('crypto'),
+            {parse} = require('querystring'),
 
             ssmClient = new SSMClient({region: '${AWS::Region}'}),
             sigV4 = new SignatureV4({
@@ -77,7 +78,9 @@ Resources:
                     method: request.method,
                     protocol: 'https:',
                     path: request.uri,
-                    // query: ...,
+                    query: request.querystring
+                      ? parse(request.querystring)
+                      : null,
                     headers: Object
                       .entries(request.headers)
                       .filter(([key]) => eh.indexOf(key) < 0)
