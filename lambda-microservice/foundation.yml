@@ -361,6 +361,7 @@ Resources:
 
   VpcPrivateSubnet1:
       Type: "AWS::EC2::Subnet"
+      Description: Resources in private subnet can access the internet but cannot be accessed outside the subnet
       Properties:
         VpcId: !Ref Vpc
         CidrBlock: 192.168.10.0/24
@@ -376,6 +377,7 @@ Resources:
 
   VpcPrivateSubnet2:  # AWS::RDS::DBSubnetGroup requires at least 2 subnets
     Type: "AWS::EC2::Subnet"
+    Description: Resources in private subnet can access the internet but cannot be accessed outside the subnet
     Properties:
       VpcId: !Ref Vpc
       CidrBlock: 192.168.20.0/24
@@ -391,6 +393,7 @@ Resources:
 
   VpcPublicSubnet:
     Type: "AWS::EC2::Subnet"
+    Description: Resources in public subnet can access the internet and also can be accessed outside the subnet
     Properties:
       VpcId: !Ref Vpc
       CidrBlock: 192.168.30.0/24
