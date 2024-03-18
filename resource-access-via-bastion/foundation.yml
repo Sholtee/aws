@@ -273,9 +273,13 @@ Resources:
         - ami
       InstanceType: t2.micro
       KeyName: !Ref BastionAccessKey
-      SubnetId: !Ref VpcPublicSubnet
-      SecurityGroupIds:
-        - !Ref BastionSecurityGroup
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeleteOnTermination: true
+          SubnetId: !Ref  VpcPublicSubnet
+          DeviceIndex: 0
+          GroupSet:
+            - !Ref BastionSecurityGroup
       Tags:
         -
           Key: Name
@@ -284,9 +288,9 @@ Resources:
   BastionAccessKey:
     Type: AWS::EC2::KeyPair
     Properties:
-      KeyFormat: pem
+      KeyFormat: ppk
       KeyName: BastionAccessKey
-      KeyType: rsa
+      KeyType: pem
 
   BastionSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -302,7 +306,7 @@ Resources:
 
 Outputs:
   BastionEndpoint:
-    Value: !Ref VpcNatElasticIP
+    Value: !GetAtt BastionInstance.PublicIp
     Export:
       Name: !Sub "${app}-bastion-endpoint"
   BastionPrivateKeyPath:
