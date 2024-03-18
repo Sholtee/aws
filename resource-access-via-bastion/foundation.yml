@@ -1,0 +1,317 @@
+#####################################################
+# foundation.yml
+#
+# Author: Denes Solti
+#####################################################
+Description: Foundation infrastructure. Can be deployed in any region
+
+Parameters:
+  app:
+    Type: String
+    Description: The application name (including prefix)
+    MaxLength: '32'
+  clientIP:
+    Type: String
+    Description: IP address to be allowed to initiate SSH connection
+
+Mappings:
+  RegionMap:
+    eu-north-1:
+      ami: ami-06bfd6343550d4a29
+    ap-south-1:
+      ami: ami-052cef05d01020f1d
+    eu-west-3:
+      ami: ami-0d3c032f5934e1b41
+    eu-west-2:
+      ami: ami-0d37e07bd4ff37148
+    eu-west-1:
+      ami: ami-04dd4500af104442f
+    ap-northeast-3:
+      ami: ami-0f1ffb565070e6947
+    ap-northeast-2:
+      ami: ami-0eb14fe5735c13eb5
+    ap-northeast-1:
+      ami: ami-0218d08a1f9dac831
+    sa-east-1:
+      ami: ami-0056d4296b1120bc3
+    ca-central-1:
+      ami: ami-0bae7412735610274
+    ap-southeast-1:
+      ami: ami-0dc5785603ad4ff54
+    ap-southeast-2:
+      ami: ami-0bd2230cfb28832f7
+    eu-central-1:
+      ami: ami-05d34d340fb1d89e5
+    us-east-1:
+      ami: ami-0ed9277fb7eb570c9
+    us-east-2:
+      ami: ami-002068ed284fb165b
+    us-west-1:
+      ami: ami-03af6a70ccd8cb578
+    us-west-2:
+      ami: ami-00f7e5c52c0f43726
+
+Resources:
+  ###################
+  # VPC
+  ###################
+
+  Vpc:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: 192.168.0.0/16
+      InstanceTenancy: default
+
+  VpcPrivateSubnet1:
+    Type: "AWS::EC2::Subnet"
+    Description: Resources in private subnet can access the internet but cannot be accessed outside the subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 192.168.10.0/24
+      AvailabilityZone: !Select
+        - 0
+        - Fn::GetAZs: !Ref "AWS::Region"
+
+  VpcPrivateSubnet1RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref VpcNatRouteTable
+      SubnetId: !Ref VpcPrivateSubnet1
+
+  VpcPrivateSubnet2:  # AWS::RDS::DBSubnetGroup requires at least 2 subnets
+    Type: "AWS::EC2::Subnet"
+    Description: Resources in private subnet can access the internet but cannot be accessed outside the subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 192.168.20.0/24
+      AvailabilityZone: !Select
+        - 1
+        - Fn::GetAZs: !Ref "AWS::Region"
+
+  VpcPrivateSubnet2RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref VpcNatRouteTable
+      SubnetId: !Ref VpcPrivateSubnet2
+
+  VpcPublicSubnet:
+    Type: "AWS::EC2::Subnet"
+    Description: Resources in public subnet can access the internet and also can be accessed outside the subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 192.168.30.0/24
+
+  VpcPublicSubnetRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref VpcInternetRouteTable
+      SubnetId: !Ref VpcPublicSubnet
+
+  VpcInternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+
+  VpcInternetGatewayAttachment:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      VpcId: !Ref "Vpc"
+      InternetGatewayId: !Ref "VpcInternetGateway"
+
+  VpcInternetRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref "Vpc"
+
+  VpcInternetRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref "VpcInternetGateway"
+      RouteTableId: !Ref "VpcInternetRouteTable"
+
+  VpcNatElasticIP:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: "vpc"
+
+  VpcNatGateway:
+    Type: "AWS::EC2::NatGateway"
+    Properties:
+      AllocationId: !GetAtt "VpcNatElasticIP.AllocationId"
+      SubnetId: !Ref "VpcPublicSubnet"
+
+  VpcNatRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref "Vpc"
+
+  VpcNatRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref VpcNatGateway
+      RouteTableId: !Ref VpcNatRouteTable
+
+  ###################
+  # Redis
+  ###################
+
+  RedisReplicationGroup:
+    Type: AWS::ElastiCache::ReplicationGroup
+    Properties:
+      ReplicationGroupId: !Sub "${app}-redis-cluster"
+      ReplicationGroupDescription: Redis cache
+      CacheNodeType: cache.t4g.micro
+      CacheSubnetGroupName: !Ref RedisSubnetGroup
+      CacheParameterGroupName: default.redis7
+      Engine: redis
+      AutomaticFailoverEnabled: false
+      NumNodeGroups: 1
+      SecurityGroupIds:
+        - !Ref RedisSecurityGroup
+
+  RedisSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: Redis cache subnet group
+      SubnetIds:
+        - !Ref VpcPrivateSubnet1
+        - !Ref VpcPrivateSubnet2
+
+  RedisSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Redis cache security groups
+      VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: "0.0.0.0/0"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          CidrIp: !GetAtt VpcPrivateSubnet1.CidrBlock
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          CidrIp: !GetAtt VpcPrivateSubnet2.CidrBlock
+
+  ###################
+  # MySQL
+  ###################
+
+  DbCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      DBClusterIdentifier: !Sub "${app}-mysql-cluster"
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      Engine: aurora-mysql
+      EngineVersion: 8.0.mysql_aurora.3.06.0
+      MasterUsername: !Sub '{{resolve:secretsmanager:${DbSecret}:SecretString:username}}'
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DbSecret}:SecretString:password}}'
+      DatabaseName: 'testdb'
+      EnableHttpEndpoint: false
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: 0.5
+        MaxCapacity: 1
+      VpcSecurityGroupIds:
+        - !Ref DbSecurityGroup
+
+  DbInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBClusterIdentifier: !Ref DbCluster
+      DBInstanceIdentifier: !Sub "${app}-mysql-instance"
+      DBInstanceClass: db.serverless
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      Engine: aurora-mysql
+      EngineVersion: 8.0.mysql_aurora.3.06.0
+      PubliclyAccessible: false
+
+  DbSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${app}-mysql-secret"
+      GenerateSecretString:
+        SecretStringTemplate: !Sub '{"username": "root"}'
+        GenerateStringKey: "password"
+        ExcludePunctuation: true
+        PasswordLength: 16
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Db subnet group
+      SubnetIds:
+        - !Ref VpcPrivateSubnet1
+        - !Ref VpcPrivateSubnet2
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: DB cluster VPC security group
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: !GetAtt VpcPrivateSubnet1.CidrBlock
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: !GetAtt VpcPrivateSubnet2.CidrBlock
+
+  ###################
+  # Bastion EC2
+  ###################
+
+  BastionInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap
+        - RegionMap
+        - !Ref 'AWS::Region'
+        - ami
+      InstanceType: t2.micro
+      KeyName: !Ref BastionAccessKey
+      SubnetId: !Ref VpcPublicSubnet
+      SecurityGroupIds:
+        - !Ref BastionSecurityGroup
+      Tags:
+        -
+          Key: Name
+          Value: !Sub "${app}-bastion"
+
+  BastionAccessKey:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyFormat: pem
+      KeyName: BastionAccessKey
+      KeyType: rsa
+
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: BastionSG
+      GroupDescription: "Allow SSH connection"
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIpv6: !Sub "${clientIP}/64"
+
+Outputs:
+  BastionEndpoint:
+    Value: !Ref VpcNatElasticIP
+    Export:
+      Name: !Sub "${app}-bastion-endpoint"
+  BastionPrivateKeyPath:
+    Value: !Sub "/ec2/keypair/${BastionAccessKey.KeyPairId}"
+  MySqlEndpoint:
+    Value: !GetAtt DbCluster.Endpoint.Address
+    Export:
+      Name: !Sub "${app}-mysql-endpoint"
+  RedisEndpoint:
+    Value: !GetAtt RedisReplicationGroup.PrimaryEndPoint.Address
+    Export:
+      Name: !Sub "${app}-redis-endpoint"
