@@ -190,10 +190,17 @@ Resources:
           FromPort: 6379
           ToPort: 6379
           CidrIp: !GetAtt VpcPrivateSubnet1.CidrBlock
+          Description: "Resources in Private Subnet 1"
         - IpProtocol: tcp
           FromPort: 6379
           ToPort: 6379
           CidrIp: !GetAtt VpcPrivateSubnet2.CidrBlock
+          Description: "Resources in Private Subnet 2"
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          CidrIp: !Sub "${BastionInstance.PrivateIp}/32"
+          Description: "Bastion Private IP"
 
   ###################
   # MySQL
@@ -255,10 +262,17 @@ Resources:
           FromPort: 3306
           ToPort: 3306
           CidrIp: !GetAtt VpcPrivateSubnet1.CidrBlock
+          Description: "Resources in Private Subnet 1"
         - IpProtocol: tcp
           FromPort: 3306
           ToPort: 3306
           CidrIp: !GetAtt VpcPrivateSubnet2.CidrBlock
+          Description: "Resources in Private Subnet 1"
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: !Sub "${BastionInstance.PrivateIp}/32"
+          Description: "Bastion Private IP"
 
   ###################
   # Bastion EC2

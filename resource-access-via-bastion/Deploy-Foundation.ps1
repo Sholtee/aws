@@ -52,8 +52,13 @@ aws ssm get-parameter `
   --output text `
   > ./bastion-private.pem
 
+aws secretsmanager get-secret-value `
+  --secret-id $(Get-Output -name 'MySqlSecret') `
+  --region ${region} `
+  --query SecretString `
+  --output text `
+  > ./mysql.secret
 
 Write-Host "Bastion endpoint: $(Get-Output -name 'BastionEndpoint')"
 Write-Host "MySql endpoint: $(Get-Output -name 'MySqlEndpoint')"
-Write-Host "MySql secret: $(Get-Output -name 'MySqlSecret')"
 Write-Host "Redis endpoint: $(Get-Output -name 'RedisEndpoint')"
