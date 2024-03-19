@@ -288,9 +288,9 @@ Resources:
   BastionAccessKey:
     Type: AWS::EC2::KeyPair
     Properties:
-      KeyFormat: ppk
+      KeyFormat: pem
       KeyName: BastionAccessKey
-      KeyType: pem
+      KeyType: rsa
 
   BastionSecurityGroup:
     Type: AWS::EC2::SecurityGroup
