@@ -1,0 +1,10 @@
+{
+  "name": "get_image",
+  "version": "0.0.0",
+  "dependencies": {
+    "@aws-sdk/client-ec2": "^3.535.0"
+  },
+  "engines": {
+    "node": ">=18.17.1"
+  }
+}
