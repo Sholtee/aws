@@ -1,6 +1,6 @@
 ![Dependency Graph](architecture.png)
 
-# Resource access via EC2 bastion
+# Resource access via SSH
 
 ## Prerequisites
 - [PowerShell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.4#install-powershell-using-winget-recommended)
