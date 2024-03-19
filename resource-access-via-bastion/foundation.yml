@@ -302,7 +302,8 @@ Resources:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIpv6: !Sub "${clientIP}/64"
+          CidrIp: !Sub "${clientIP}/32"
+          Description: "My public IP"
 
 Outputs:
   BastionEndpoint:
@@ -315,6 +316,10 @@ Outputs:
     Value: !GetAtt DbCluster.Endpoint.Address
     Export:
       Name: !Sub "${app}-mysql-endpoint"
+  MySqlSecret:
+    Value: !Ref DbSecret
+    Export:
+      Name: !Sub "${app}-mysql-secret-arn"
   RedisEndpoint:
     Value: !GetAtt RedisReplicationGroup.PrimaryEndPoint.Address
     Export:

@@ -28,7 +28,7 @@ aws cloudformation ${action}-stack `
   --stack-name ${stackName} `
   --region ${region} `
   --template-body file://./foundation.yml `
-  --parameters "ParameterKey=app,ParameterValue=${app}" "ParameterKey=clientIP,ParameterValue=$((Invoke-WebRequest ifconfig.me/ip).Content.Trim())"`
+  --parameters "ParameterKey=app,ParameterValue=${app}" "ParameterKey=clientIP,ParameterValue=$((Invoke-WebRequest -uri "https://api.ipify.org/").Content.Trim())"`
   --capabilities CAPABILITY_NAMED_IAM
 
 aws cloudformation wait stack-${action}-complete `
@@ -53,8 +53,7 @@ aws ssm get-parameter `
   > ./bastion-private.pem
 
 
-Get-Output -name 'BastionEndpoint'
-
-Get-Output -name 'MySqlEndpoint'
-
-Get-Output -name 'RedisEndpoint'
+Write-Host "Bastion endpoint: $(Get-Output -name 'BastionEndpoint')"
+Write-Host "MySql endpoint: $(Get-Output -name 'MySqlEndpoint')"
+Write-Host "MySql secret: $(Get-Output -name 'MySqlSecret')"
+Write-Host "Redis endpoint: $(Get-Output -name 'RedisEndpoint')"
