@@ -467,7 +467,7 @@ Resources:
         MinCapacity: 0.5
         MaxCapacity: 1
       VpcSecurityGroupIds:
-        - !Ref DbVpcSecurityGroup
+        - !Ref DbSecurityGroup
 
   DbInstance1:
     Type: AWS::RDS::DBInstance
@@ -509,7 +509,7 @@ Resources:
         - !Ref VpcPrivateSubnet1
         - !Ref VpcPrivateSubnet2
 
-  DbVpcSecurityGroup:
+  DbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: DB cluster VPC security group
@@ -518,7 +518,11 @@ Resources:
         - IpProtocol: tcp
           FromPort: 3306
           ToPort: 3306
-          CidrIp: 0.0.0.0/0
+          CidrIp: !GetAtt VpcPrivateSubnet1.CidrBlock
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: !GetAtt VpcPrivateSubnet2.CidrBlock
 
 #####################
 # Outputs
