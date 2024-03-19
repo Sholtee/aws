@@ -1,5 +1,5 @@
 {
-  "name": "signer_test",
+  "name": "test-scripts",
   "version": "0.0.0",
   "dependencies": {
     "@aws-sdk/signature-v4": "^3.374.0",
