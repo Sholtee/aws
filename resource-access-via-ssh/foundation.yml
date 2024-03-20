@@ -245,6 +245,7 @@ Resources:
     Type: AWS::CloudFormation::CustomResource
     Properties:
       Region: !Ref AWS::Region
+      Filter: Amazon Linux 2023*x86_64 HVM kernel-6.1
       ServiceToken: !GetAtt FetchLatestImageFunction.Arn
 
   FetchLatestImageFunction:
@@ -261,7 +262,8 @@ Resources:
             console.log('Getting images...');
             try {          
               const
-                client = new EC2Client({region: event.ResourceProperties.Region}),
+                {Region, Filter} = event.ResourceProperties,
+                client = new EC2Client({region: Region}),
                 {Images} = await client.send(new DescribeImagesCommand({
                   Filters: [
                     {
@@ -270,7 +272,7 @@ Resources:
                     },
                     {
                       Name: 'description',
-                      Values: ['Amazon Linux 2023*x86_64 HVM kernel-6.1']
+                      Values: [Filter]
                     }
                   ],
                   Owners: ['amazon']
