@@ -13,7 +13,18 @@ Parameters:
   functionName:
     Type: String
     Description: The lambda function name
-    
+  concurrentExecutions:
+    Description: How many lambda instances should be kept ready
+    Type: Number
+    Default: 0
+
+Conditions:
+  ProvisionedConcurrentExecutionsEnabled:
+    Fn::Not:
+      - Fn::Equals:
+        - !Ref concurrentExecutions
+        - '0'
+
 Resources:
   #####################
   # Lambda
@@ -23,7 +34,9 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:     
       Code:
-         ZipFile: // placeholder
+         ZipFile: |
+           // placeholder
+           exports.handler = function() {};
       FunctionName: !Ref functionName
       Handler: index.handler
       Role: !GetAtt RequestHandlerLambdaRole.Arn
@@ -45,14 +58,35 @@ Resources:
           DB_SECRET_ARN:
             Fn::ImportValue: !Sub "${app}-db-secret-arn"
 
+  RequestHandlerLambdaVersion:
+    Type: AWS::Lambda::Version
+    Condition: ProvisionedConcurrentExecutionsEnabled
+    Description: ProvisionedConcurrentExecutions requires exact version
+    Properties:
+      FunctionName: !Ref RequestHandlerLambda
+
+  RequestHandlerLambdaVersionAlias:
+    Type: AWS::Lambda::Alias
+    Condition: ProvisionedConcurrentExecutionsEnabled
+    Description: Alias pointing the latest armed version. It also configures the ProvisionedConcurrentExecutions
+    Properties:
+      FunctionName: !Ref RequestHandlerLambda
+      FunctionVersion: !GetAtt RequestHandlerLambdaVersion.Version
+      Name: armed-version
+      ProvisionedConcurrencyConfig:
+        ProvisionedConcurrentExecutions: !Ref concurrentExecutions
+
   RequestHandlerLambdaUrl:
-    Type: "AWS::Lambda::Url"
+    Type: AWS::Lambda::Url
     Properties:
       AuthType: AWS_IAM
-      TargetFunctionArn: !Ref RequestHandlerLambda
+      TargetFunctionArn: !If
+        - ProvisionedConcurrentExecutionsEnabled
+        - !Ref RequestHandlerLambdaVersionAlias # AWS::Lambda::Url cannot be applied against specific version so apply against an alias
+        - !Ref RequestHandlerLambda
 
   RequestHandlerLambdaRole:
-    Type: "AWS::IAM::Role"
+    Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -87,7 +121,10 @@ Resources:
   RequestHandlerLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !Ref RequestHandlerLambda
+      FunctionName: !If
+        - ProvisionedConcurrentExecutionsEnabled
+        - !Ref RequestHandlerLambdaVersionAlias
+        - !Ref RequestHandlerLambda
       Principal:
         Fn::ImportValue: !Sub "${app}-request-signer-user-arn"
       Action: 'lambda:InvokeFunctionUrl'
