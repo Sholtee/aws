@@ -1,0 +1,4 @@
+{
+  "app": "lambda-microservice",
+  "provisionedConcurrency": 0
+}

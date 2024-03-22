@@ -13,16 +13,16 @@ Parameters:
   functionName:
     Type: String
     Description: The lambda function name
-  concurrentExecutions:
+  provisionedConcurrency:
     Description: How many lambda instances should be kept ready
     Type: Number
     Default: 0
 
 Conditions:
-  ProvisionedConcurrentExecutionsEnabled:
+  ProvisionedConcurrencyEnabled:
     Fn::Not:
       - Fn::Equals:
-        - !Ref concurrentExecutions
+        - !Ref provisionedConcurrency
         - '0'
 
 Resources:
@@ -60,28 +60,28 @@ Resources:
 
   RequestHandlerLambdaVersion:
     Type: AWS::Lambda::Version
-    Condition: ProvisionedConcurrentExecutionsEnabled
-    Description: ProvisionedConcurrentExecutions requires exact version
+    Condition: ProvisionedConcurrencyEnabled
+    Description: Provisioned Concurrent Executions requires exact version
     Properties:
       FunctionName: !Ref RequestHandlerLambda
 
   RequestHandlerLambdaVersionAlias:
     Type: AWS::Lambda::Alias
-    Condition: ProvisionedConcurrentExecutionsEnabled
-    Description: Alias pointing the latest armed version. It also configures the ProvisionedConcurrentExecutions
+    Condition: ProvisionedConcurrencyEnabled
+    Description: Alias pointing the latest armed version. It also configures the Provisioned Concurrent Executions
     Properties:
       FunctionName: !Ref RequestHandlerLambda
       FunctionVersion: !GetAtt RequestHandlerLambdaVersion.Version
       Name: armed-version
       ProvisionedConcurrencyConfig:
-        ProvisionedConcurrentExecutions: !Ref concurrentExecutions
+        ProvisionedConcurrentExecutions: !Ref provisionedConcurrency
 
   RequestHandlerLambdaUrl:
     Type: AWS::Lambda::Url
     Properties:
       AuthType: AWS_IAM
       TargetFunctionArn: !If
-        - ProvisionedConcurrentExecutionsEnabled
+        - ProvisionedConcurrencyEnabled
         - !Ref RequestHandlerLambdaVersionAlias # AWS::Lambda::Url cannot be applied against specific version so apply against an alias
         - !Ref RequestHandlerLambda
 
@@ -122,7 +122,7 @@ Resources:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !If
-        - ProvisionedConcurrentExecutionsEnabled
+        - ProvisionedConcurrencyEnabled
         - !Ref RequestHandlerLambdaVersionAlias
         - !Ref RequestHandlerLambda
       Principal:

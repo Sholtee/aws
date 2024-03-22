@@ -11,7 +11,7 @@
 ## Installation
 - `.\Deploy-Global.ps1 -action create -app lambda-microservice -profile default`
 - `.\Deploy-Foundation.ps1 -action create -config "./foundation.json" -region eu-central-1 -profile default`
-- `.\Deploy-Service.ps1 -action create -app lambda-microservice -region eu-central-1 -service service1 -profile default`
+- `.\Deploy-Service.ps1 -action create -region eu-central-1 -service service1 -config "./service1.json" -profile default`
 
 ## Test
 Visit `https://DISTRO_ID.cloudfront.net` or `https://DISTRO_ID.cloudfront.net/ANY_INVALID`

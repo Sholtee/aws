@@ -3,7 +3,7 @@
 #
 # Author: Denes Solti
 #
-# Usage: Deploy-Service.ps1 -action [create|update] -app app-name -service service-name -profile profile-name -region region-name [-concurrent-executions 10]
+# Usage: Deploy-Service.ps1 -action [create|update] -service service-name -config "./service1.json" -profile profile-name -region region-name
 #
 
 param(
@@ -11,41 +11,41 @@ param(
   [string]$action,
 
   [Parameter(Position=1, Mandatory=$true)]
-  [string]$app,
+  [string]$service,
 
   [Parameter(Position=2, Mandatory=$true)]
-  [string]$service,
+  [string]$config,
 
   [Parameter(Position=3, Mandatory=$true)]
   [string]$profile,
 
   [Parameter(Position=4, Mandatory=$true)]
-  [string]$region,
-
-  [Parameter(Position=5, Mandatory=$false)]
-  [int]$concurrentExecutions=0
+  [string]$region
 )
 
 $ErrorActionPreference = "Stop"
 
-$functionName = "${app}-${service}-lambda"
+$configJson = Get-Content $config -Raw | ConvertFrom-Json
+$functionName = "$($configJson.app)-${service}-lambda"
+$stackName = "$($configJson.app)-${service}"
 
-$stackId = $(aws cloudformation ${action}-stack `
-  --profile ${profile} `
-  --stack-name "${app}-${service}" `
-  --region ${region} `
-  --template-body "file://./${service}.yml" `
-  --parameters `
-    "ParameterKey=app,ParameterValue=${app}" `
-    "ParameterKey=functionName,ParameterValue=${functionName}" `
-    "ParameterKey=concurrentExecutions,ParameterValue=${concurrentExecutions}" `
-  --capabilities CAPABILITY_NAMED_IAM `
-  --output text `
-  --query 'StackId'`
+$configJson.PSObject.Properties | ForEach-Object `
+  -Begin {$params="`"ParameterKey=app,ParameterValue=$($configJson.app)`" `"ParameterKey=functionName,ParameterValue=${functionName}`" "} `
+  -Process {$params += " `"ParameterKey=$($_.Name),ParameterValue=$($_.Value)`""}
+
+$stackId = Invoke-Expression ("aws cloudformation ${action}-stack " +
+  "--profile ${profile} "                                           +
+  "--stack-name ${stackName} "                                      +
+  "--region ${region} "                                             +
+  "--template-body `"file://./${service}.yml`" "                    +
+  "--parameters ${params} "                                         +
+  "--capabilities CAPABILITY_NAMED_IAM "                            +
+  "--output text "                                                  +
+  "--query 'StackId'"
 )
 if ($stackId) {
   Write-Host "Updating the stack..."
-  aws cloudformation wait stack-${action}-complete --region ${region} --stack-name "${app}-${service}"
+  aws cloudformation wait stack-${action}-complete --region ${region} --stack-name ${stackName}
 }
 
 Write-Host "Deploying function code..."
