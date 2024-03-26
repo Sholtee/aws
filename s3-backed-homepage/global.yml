@@ -110,11 +110,9 @@ Resources:
                 - iam:CreateServiceLinkedRole
                 - cloudfront:UpdateDistribution
               Resource: '*'
-        
-  RouterLambdaId:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Description: Lambda ID. Resources from other regions can use this parameter. It requires as cross region export/import is not allowed (03.09.2024)
+
+Outputs:
+  RouterLambdaId:  # export among regions not supported
+    Value: !Ref RouterLambdaVersion
+    Export:
       Name: !Sub "${app}-router-lambda-id"
-      Value: !Ref RouterLambdaVersion
-      Type: String
