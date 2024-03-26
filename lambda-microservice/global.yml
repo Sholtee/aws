@@ -181,22 +181,6 @@ Resources:
       Name: !Sub "${app}-request-signer-excluded-headers"
       Value: x-forwarded-for,te
       Type: String
-  
-  RequestSignerLambdaArn:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Description: Request signer lambda ARN. Resources from other regions can use this parameter. It requires as cross region export/import is not allowed
-      Name: !Sub "${app}-request-signer-lambda-arn"
-      Value: !Ref RequestSignerLambdaVersion
-      Type: String
-
-  RequestSignerUserArn:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Description: Request signer user ARN. Resources from other regions can use this parameter. It requires as cross region export/import is not allowed
-      Name: !Sub "${app}-request-signer-user-arn"
-      Value: !GetAtt RequestSignerUser.Arn
-      Type: String
 
   RequestSignerUserKey:
     Type: AWS::SSM::Parameter
@@ -211,3 +195,14 @@ Resources:
       Name: !Sub "${app}-request-signer-user-secret"
       Value: !GetAtt RequestSignerUserAccessKey.SecretAccessKey
       Type: String
+
+Outputs:
+  RequestSignerLambdaArn:  # export among regions not supported
+    Value: !Ref RequestSignerLambdaVersion
+    Export:
+      Name: !Sub "${app}-request-signer-lambda-arn"
+
+  RequestSignerUserArn:
+    Value: !GetAtt RequestSignerUser.Arn
+    Export:
+      Name: !Sub "${app}-request-signer-user-arn"

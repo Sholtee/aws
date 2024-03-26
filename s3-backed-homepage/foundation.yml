@@ -73,7 +73,7 @@ Resources:
             TargetOriginId: FrontendBucketOrigin
             LambdaFunctionAssociations:
               - EventType: origin-request
-                LambdaFunctionARN: !GetAtt RouterLambdaId.Value            
+                LambdaFunctionARN: !GetAtt RouterLambdaArn.Value
           - PathPattern: "/static/*"
             AllowedMethods:
               - 'GET'
@@ -100,12 +100,12 @@ Resources:
   # Global access
   ###################        
       
-  RouterLambdaId:
+  RouterLambdaArn:
     Type: AWS::CloudFormation::CustomResource
     Properties:
       DeploymentId: !Ref deploymentId  # Force refresh of RouterLambdaId.Value on each deployment
       Stack: !Sub "${app}-globals"
-      Export: !Sub "${app}-router-lambda-id"
+      Export: !Sub "${app}-router-lambda-arn"
       ServiceToken: !GetAtt FetchGlobalOutputFunction.Arn
 
   FetchGlobalOutputFunction:

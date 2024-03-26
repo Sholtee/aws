@@ -112,7 +112,7 @@ Resources:
               Resource: '*'
 
 Outputs:
-  RouterLambdaId:  # export among regions not supported
+  RouterLambdaArn:  # export among regions not supported
     Value: !Ref RouterLambdaVersion
     Export:
-      Name: !Sub "${app}-router-lambda-id"
+      Name: !Sub "${app}-router-lambda-arn"
