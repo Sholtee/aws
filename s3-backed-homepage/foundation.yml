@@ -93,7 +93,7 @@ Resources:
           CachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
           LambdaFunctionAssociations:
             - EventType: origin-request
-              LambdaFunctionARN: !GetAtt RouterLambdaId.Value  # Will allow requests against "/" and "/index.html" only
+              LambdaFunctionARN: !GetAtt RouterLambdaArn.Value  # Will allow requests against "/" and "/index.html" only
           TargetOriginId: FrontendBucketOrigin
           
   ###################
