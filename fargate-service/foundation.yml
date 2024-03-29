@@ -1,0 +1,204 @@
+#####################################################
+# foundation.yml
+#
+# Author: Denes Solti
+#####################################################
+Description: Foundation infrastructure. Can be deployed in any region
+
+Parameters:
+  app:
+    Type: String
+    Description: The application name (including prefix)
+    MaxLength: '32'
+  certificateArn:
+    Type: String
+    Description: Certificate to be used in HTTPListener
+
+Resources:
+  EcrRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${app}-repository"
+
+  ServicesCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${app}-services-cluster"
+
+  ###################
+  # VPC
+  ###################
+
+  Vpc:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: 192.168.0.0/16
+      InstanceTenancy: default
+
+  VpcPrivateSubnet1:
+    Type: "AWS::EC2::Subnet"
+    Description: Resources in private subnet can access the internet but cannot be accessed outside the subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 192.168.10.0/24
+      AvailabilityZone: !Select
+        - 0
+        - Fn::GetAZs: !Ref "AWS::Region"
+
+  VpcPrivateSubnet1RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref VpcNatRouteTable
+      SubnetId: !Ref VpcPrivateSubnet1
+
+  VpcPrivateSubnet2:
+    Type: "AWS::EC2::Subnet"
+    Description: Resources in private subnet can access the internet but cannot be accessed outside the subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 192.168.20.0/24
+      AvailabilityZone: !Select
+        - 1
+        - Fn::GetAZs: !Ref "AWS::Region"
+
+  VpcPrivateSubnet2RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref VpcNatRouteTable
+      SubnetId: !Ref VpcPrivateSubnet2
+
+  VpcPublicSubnet:
+    Type: "AWS::EC2::Subnet"
+    Description: Resources in public subnet can access the internet and also can be accessed outside the subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 192.168.30.0/24
+
+  VpcPublicSubnetRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref VpcInternetRouteTable
+      SubnetId: !Ref VpcPublicSubnet
+
+  VpcInternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+
+  VpcInternetGatewayAttachment:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      VpcId: !Ref "Vpc"
+      InternetGatewayId: !Ref "VpcInternetGateway"
+
+  VpcInternetRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref "Vpc"
+
+  VpcInternetRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref "VpcInternetGateway"
+      RouteTableId: !Ref "VpcInternetRouteTable"
+
+  VpcNatElasticIP:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: "vpc"
+
+  VpcNatGateway:
+    Type: "AWS::EC2::NatGateway"
+    Properties:
+      AllocationId: !GetAtt "VpcNatElasticIP.AllocationId"
+      SubnetId: !Ref "VpcPublicSubnet"
+
+  VpcNatRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref "Vpc"
+
+  VpcNatRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref VpcNatGateway
+      RouteTableId: !Ref VpcNatRouteTable
+
+  #####################
+  # Load balancer
+  #####################
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Scheme: internet-facing
+      Subnets:
+        - !Ref VpcPrivateSubnet1
+        - !Ref VpcPrivateSubnet2
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref certificateArn
+      DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            StatusCode: 404
+            MessageBody: '{"error": "notFound"}'
+            ContentType: 'application/json'
+
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTPS from all
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+#####################
+# Outputs
+#####################
+
+Outputs:
+  EcrRepositoryUri:
+    Value: !GetAtt EcrRepository.RepositoryUri
+    Export:
+      Name: !Sub "${app}-ecr-repository-uri"
+  HTTPSListenerArn:
+    Value: !Ref HTTPSListener
+    Export:
+      Name: !Sub "${app}-http-listener-arn"
+  ServicesCluster:
+    Value: !Ref ServicesCluster
+    Export:
+      Name: !Sub "${app}-services-cluster"
+  Subnet1Id:
+    Value: !Ref VpcPrivateSubnet1
+    Export:
+      Name: !Sub "${app}-vpc-subnet-1-id"
+  Subnet1CidrIp:
+    Value: !GetAtt VpcPrivateSubnet1.CidrBlock
+    Export:
+      Name: !Sub "${app}-vpc-subnet-1-cidr-ip"
+  Subnet2Id:
+    Value: !Ref VpcPrivateSubnet2
+    Export:
+      Name: !Sub "${app}-vpc-subnet-2-id"
+  Subnet2CidrIp:
+    Value: !GetAtt VpcPrivateSubnet2.CidrBlock
+    Export:
+      Name: !Sub "${app}-vpc-subnet-2-cidr-ip"
+  VpcId:
+    Value: !Ref Vpc
+    Export:
+      Name: !Sub "${app}-vpc-id"
