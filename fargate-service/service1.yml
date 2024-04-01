@@ -133,13 +133,13 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-group: !Ref ServiceLogGroup
               awslogs-stream-prefix: serviceLog
-          # Environment:
-            # DB_NAME:
-            #   Fn::ImportValue: !Sub "${app}-db-name"
-            # DB_ENDPOINT:
-            #   Fn::ImportValue: !Sub "${app}-db-endpoint"
-            # DB_SECRET_ARN:
-            #   Fn::ImportValue: !Sub "${app}-db-secret-arn"
+          HealthCheck:
+            Command:
+              - CMD-SHEL
+              - !Sub "curl --fail http://localhost:${port}/healthcheck || exit 1"
+          Environment:
+            - Name: SERVICE_PORT
+              Value: !Ref port
           Image: !Ref image
           PortMappings:
             - ContainerPort: !Ref port
