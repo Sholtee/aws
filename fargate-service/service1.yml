@@ -17,6 +17,10 @@ Parameters:
     Type: Number
     Description: Port on which the service will be listening
     Default: 1986
+  healthCheckInterval:
+    Type: Number
+    Description: Seconds after which a new healthcheck cycle should be triggered
+    Default: 60
 
 Resources:
   Service:
@@ -72,6 +76,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       HealthCheckPath: '/healthcheck'
+      HealthCheckIntervalSeconds: !Ref healthCheckInterval
       VpcId:
         Fn::ImportValue: !Sub "${app}-vpc-id"
       TargetType: ip
@@ -135,8 +140,10 @@ Resources:
               awslogs-stream-prefix: serviceLog
           HealthCheck:
             Command:
-              - CMD-SHEL
+              - CMD-SHELL
               - !Sub "curl --fail http://localhost:${port}/healthcheck || exit 1"
+            Interval: !Ref healthCheckInterval
+            Retries: 2
           Environment:
             - Name: SERVICE_PORT
               Value: !Ref port
