@@ -18,6 +18,13 @@ const
     cert: readFileSync('./cert/certificate.crt')
   };
 
+app.get('/', (req, res) => {
+  console.log('Requesting hello');
+  res.setHeader('content-type', 'application/json');
+  res.status(200);
+  res.send(JSON.stringify('Hello world!'));
+});
+
 app.get('/healthcheck', async (req, res) => {
   console.log('Healthcheck initiated');
   res.setHeader('content-type', 'application/json');
