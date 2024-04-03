@@ -10,9 +10,11 @@ RUN apt-get -y install curl
 
 WORKDIR /code/service/
 
-COPY * .
+COPY service1/package.json service1/package-lock.json .
 
-RUN npm install
+RUN ["npm", "ci"]
+
+ADD cert cert
+COPY service1/index.mjs .
 
 CMD [ "node", "index.mjs" ]
-

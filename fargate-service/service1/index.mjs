@@ -4,9 +4,16 @@
  * Author: Denes Solti
  *****************************************************/
 'use strict';
-import express from 'express'
+import express from 'express';
+import {createServer} from 'https';
+import {readFileSync} from 'fs';
 
-const app = express();
+const
+  app = express(),
+  opts = {
+    key: readFileSync('./cert/private.key'),
+    cert: readFileSync('./cert/certificate.crt')
+  };
 
 app.get('/healthcheck', (req, res) => {
   console.log('Healthcheck initiated');
@@ -15,4 +22,4 @@ app.get('/healthcheck', (req, res) => {
   res.send(JSON.stringify('ok'));
 });
 
-app.listen(parseInt(process.env.SERVICE_PORT));
+createServer(opts, app).listen(parseInt(process.env.SERVICE_PORT));

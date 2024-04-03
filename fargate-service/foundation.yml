@@ -13,6 +13,11 @@ Parameters:
   certificateArn:
     Type: String
     Description: Certificate to be used in HTTPListener
+  dbName:
+    Type: String
+    Description: Name of the application database
+    MaxLength: '32'
+    Default: AppDb
 
 Resources:
   EcrRepository:
@@ -165,11 +170,96 @@ Resources:
           ToPort: 443
           CidrIp: 0.0.0.0/0
 
+  ###################
+  # DB
+  ###################
+
+  DbCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      DBClusterIdentifier: !Sub "${app}-db-cluster"
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      Engine: aurora-mysql
+      EngineVersion: 8.0.mysql_aurora.3.06.0
+      MasterUsername: !Sub '{{resolve:secretsmanager:${DbSecret}:SecretString:username}}'
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DbSecret}:SecretString:password}}'
+      DatabaseName: !Ref dbName
+      EnableHttpEndpoint: false
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: 0.5
+        MaxCapacity: 1
+      VpcSecurityGroupIds:
+        - !Ref DbSecurityGroup
+
+  DbInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBClusterIdentifier: !Ref DbCluster
+      DBInstanceIdentifier: !Sub "${app}-db-instance"
+      DBInstanceClass: db.serverless
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      Engine: aurora-mysql
+      EngineVersion: 8.0.mysql_aurora.3.06.0
+      PubliclyAccessible: false
+
+  DbSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${app}-db-secret"
+      GenerateSecretString:
+        SecretStringTemplate: !Sub '{"username": "root"}'
+        GenerateStringKey: "password"
+        ExcludePunctuation: true
+        PasswordLength: 16
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Db subnet group
+      SubnetIds:
+        - !Ref VpcPrivateSubnet1
+        - !Ref VpcPrivateSubnet2
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: DB cluster VPC security group
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: !GetAtt VpcPrivateSubnet1.CidrBlock
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: !GetAtt VpcPrivateSubnet2.CidrBlock
+
 #####################
 # Outputs
 #####################
 
 Outputs:
+  DbName:
+    Value: !Ref dbName
+    Export:
+      Name: !Sub "${app}-db-name"
+  DbEndpoint:
+    Value: !GetAtt DbCluster.Endpoint.Address
+    Export:
+      Name: !Sub "${app}-db-endpoint"
+  DbReaderEndpoint:
+    Value: !GetAtt DbCluster.ReadEndpoint.Address
+    Export:
+      Name: !Sub "${app}-db-reader-endpoint"
+  DbPort:
+    Value: !GetAtt DbCluster.Endpoint.Port
+    Export:
+      Name: !Sub "${app}-db-port"
+  DbSecretArn:
+    Value: !Ref DbSecret
+    Export:
+      Name: !Sub "${app}-db-secret-arn"
   EcrRepositoryUri:
     Value: !GetAtt EcrRepository.RepositoryUri
     Export:

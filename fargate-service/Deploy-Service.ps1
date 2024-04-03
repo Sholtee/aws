@@ -27,9 +27,7 @@ $ErrorActionPreference = "Stop"
 
 $stackName = "${app}-${service}"
 
-$wd="./${service}/"
-
-Start-Process docker -ArgumentList "build --platform linux/amd64 --force-rm --tag ${stackName} ." -WorkingDirectory $wd -Wait -NoNewWindow
+docker build --file ${service}/Dockerfile --platform linux/amd64 --force-rm --tag ${stackName} .
 
 $ecrHost = "$(aws sts get-caller-identity --query Account --output text).dkr.ecr.${region}.amazonaws.com"
 

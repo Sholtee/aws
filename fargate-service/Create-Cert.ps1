@@ -19,6 +19,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+New-Item -Path . -Name cert -ItemType directory | Out-Null
+
 function OpenSSL([Parameter(Position=0, Mandatory=$true)][string]$args) {
   Start-Process `
     -FilePath (Join-Path $Env:Programfiles 'Git\\usr\\bin\\openssl.exe') `
@@ -27,21 +29,15 @@ function OpenSSL([Parameter(Position=0, Mandatory=$true)][string]$args) {
     -Wait
 }
 
-try
-{
-  OpenSSL 'genrsa -out private.key 2048'
-  OpenSSL "req -new -x509 -nodes -sha1 -days 365 -extensions v3_ca -subj ""/C=US/ST=Denial/L=Springfield/O=Dis/CN=${commonName}"" -key private.key -out certificate.crt"
+OpenSSL 'genrsa -out cert/private.key 2048'
+OpenSSL "req -new -x509 -nodes -sha1 -days 365 -extensions v3_ca -subj ""/C=US/ST=Denial/L=Springfield/O=Dis/CN=${commonName}"" -key cert/private.key -out cert/certificate.crt"
 
-  Write-Host (
-    aws acm import-certificate `
-      --certificate fileb://certificate.crt `
-      --private-key fileb://private.key `
-      --region ${region} `
-      --profile ${profile} `
-      --query CertificateArn `
-      --output text
-  ).Trim()
-} finally {
-  Remove-Item -Path .\private.key -Force
-  Remove-Item -Path .\certificate.crt -Force
-}
+Write-Host (
+  aws acm import-certificate `
+    --certificate fileb://cert/certificate.crt `
+    --private-key fileb://cert/private.key `
+    --region ${region} `
+    --profile ${profile} `
+    --query CertificateArn `
+    --output text
+).Trim()

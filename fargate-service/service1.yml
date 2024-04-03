@@ -81,7 +81,7 @@ Resources:
         Fn::ImportValue: !Sub "${app}-vpc-id"
       TargetType: ip
       Port: !Ref port
-      Protocol: HTTP
+      Protocol: HTTPS
       Matcher:
         HttpCode: 200
 
@@ -141,7 +141,7 @@ Resources:
           HealthCheck:
             Command:
               - CMD-SHELL
-              - !Sub "curl --fail http://localhost:${port}/healthcheck || exit 1"
+              - !Sub "curl --fail --insecure https://localhost:${port}/healthcheck || exit 1"
             Interval: !Ref healthCheckInterval
             Retries: 2
           Environment:
