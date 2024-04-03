@@ -147,6 +147,15 @@ Resources:
           Environment:
             - Name: SERVICE_PORT
               Value: !Ref port
+            - Name: DB_NAME
+              Value:
+                Fn::ImportValue: !Sub "${app}-db-name"
+            - Name: DB_ENDPOINT
+              Value:
+                Fn::ImportValue: !Sub "${app}-db-endpoint"
+            - Name: DB_SECRET_ARN
+              Value:
+                Fn::ImportValue: !Sub "${app}-db-secret-arn"
           Image: !Ref image
           PortMappings:
             - ContainerPort: !Ref port
@@ -207,4 +216,12 @@ Resources:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
       Policies:
-        - !Ref AWS::NoValue
+        - PolicyName: allowSecretManagerAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  Fn::ImportValue: !Sub "${app}-db-secret-arn"
