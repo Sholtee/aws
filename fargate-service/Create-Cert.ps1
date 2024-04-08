@@ -19,18 +19,24 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-New-Item -Path . -Name cert -ItemType directory | Out-Null
+if (!(Test-Path cert)) {
+  New-Item -Path . -Name cert -ItemType directory | Out-Null
+}
+
+function Combine-Path([Parameter(Position = 0)][string[]]$path) {
+  return [System.IO.Path]::Combine($path)
+}
 
 function OpenSSL([Parameter(Position=0, Mandatory=$true)][string]$args) {
   Start-Process `
-    -FilePath (Join-Path $Env:Programfiles 'Git\\usr\\bin\\openssl.exe') `
+    -FilePath (Combine-Path $Env:Programfiles, 'Git', 'usr', 'bin', 'openssl.exe') `
     -ArgumentList ${args} `
     -NoNewWindow `
     -Wait
 }
 
-OpenSSL 'genrsa -out cert/private.key 2048'
-OpenSSL "req -new -x509 -nodes -sha1 -days 365 -extensions v3_ca -subj ""/C=US/ST=Denial/L=Springfield/O=Dis/CN=${commonName}"" -key cert/private.key -out cert/certificate.crt"
+OpenSSL "genrsa -out $(Combine-Path 'cert', 'private.key') 2048"
+OpenSSL "req -new -x509 -nodes -sha1 -days 365 -extensions v3_ca -subj ""/C=US/ST=Denial/L=Springfield/O=Dis/CN=${commonName}"" -key $(Combine-Path 'cert', 'private.key') -out $(Combine-Path 'cert', 'certificate.crt')"
 
 Write-Host (
   aws acm import-certificate `
