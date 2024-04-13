@@ -33,4 +33,4 @@ aws cloudformation ${action}-stack `
   --region ${region} `
   --template-body file://./foundation.yml `
   --parameters "ParameterKey=app,ParameterValue=${app}" "ParameterKey=certificateArn,ParameterValue=${certificateArn}" `
-  --capabilities CAPABILITY_NAMED_IAM
+  --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND
