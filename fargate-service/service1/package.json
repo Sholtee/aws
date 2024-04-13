@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "dependencies": {
     "express": "^4.19.2",
-    "mysql2": "^3.9.2",
+    "mysql2": "^3.9.4",
     "@aws-sdk/client-secrets-manager": "^3.543.0"
   },
   "engines": {

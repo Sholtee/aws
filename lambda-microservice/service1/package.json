@@ -2,7 +2,7 @@
   "name": "service1",
   "version": "0.0.0",
   "dependencies": {
-    "mysql2": "^3.9.2"
+    "mysql2": "^3.9.4"
   },
   "engines": {
     "node": ">=18.17.1"
