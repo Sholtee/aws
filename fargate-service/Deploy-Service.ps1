@@ -20,25 +20,33 @@ param(
   [string]$profile,
 
   [Parameter(Position=4, Mandatory=$true)]
-  [string]$region
+  [string]$region,
+
+  [switch]$skipImageUpdate = $false
 )
 
 $ErrorActionPreference = "Stop"
 
 $stackName = "${app}-${service}"
 
-docker build --file ${service}/Dockerfile --platform linux/amd64 --force-rm --tag ${stackName} .
+if (!$skipImageUpdate) {
+  docker build --file ${service}/Dockerfile --platform linux/amd64 --force-rm --tag ${stackName} .
 
-$ecrHost = "$(aws sts get-caller-identity --query Account --output text).dkr.ecr.${region}.amazonaws.com"
+  $ecrHost = "$(aws sts get-caller-identity --query Account --output text).dkr.ecr.${region}.amazonaws.com"
 
-aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${ecrHost}
-try {
-  $image = "${ecrHost}/${app}-repository:${app}-${service}-$((New-Guid).ToString('N'))"
+  aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${ecrHost}
+  try {
+    $image = "${ecrHost}/${app}-repository:${app}-${service}-$((New-Guid).ToString('N'))"
 
-  docker tag $(docker images --filter=reference=$app-$service --format "{{.ID}}") $image
-  docker push $image
-} finally {
-  docker logout ${ecrHost}
+    docker tag $(docker images --filter=reference=$app-$service --format "{{.ID}}") $image
+    docker push $image
+  } finally {
+    docker logout ${ecrHost}
+  }
+
+  $imageParam = "ParameterValue=${image}"
+} else {
+  $imageParam = "UsePreviousValue=true"
 }
 
 aws cloudformation ${action}-stack `
@@ -46,7 +54,5 @@ aws cloudformation ${action}-stack `
   --stack-name $stackName `
   --region $region `
   --template-body file://./$service.yml `
-  --parameters "ParameterKey=app,ParameterValue=${app}" "ParameterKey=image,ParameterValue=${image}" `
+  --parameters "ParameterKey=app,ParameterValue=${app}" "ParameterKey=image,${imageParam}" `
   --capabilities CAPABILITY_NAMED_IAM
-
-
