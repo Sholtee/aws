@@ -75,16 +75,16 @@ Resources:
   ###################
 
   Vpc:
-    Type: "AWS::EC2::VPC"
+    Type: AWS::EC2::VPC
     Properties:
       CidrBlock: 192.168.0.0/16
       InstanceTenancy: default
 
   VpcInternetGateway:
-    Type: "AWS::EC2::InternetGateway"
+    Type: AWS::EC2::InternetGateway
 
   VpcInternetGatewayAttachment:
-    Type: "AWS::EC2::VPCGatewayAttachment"
+    Type: AWS::EC2::VPCGatewayAttachment
     Properties:
       VpcId: !Ref Vpc
       InternetGatewayId: !Ref VpcInternetGateway
@@ -109,6 +109,7 @@ Resources:
                 - AZsByIndex
                 - Values
                 - !Ref SubnetIndex
+          MapPublicIpOnLaunch: false
 
       VpcPrivateRouteTable${SubnetIndex}:
         Type: AWS::EC2::RouteTable
@@ -122,6 +123,15 @@ Resources:
             Fn::Sub: "VpcPrivateRouteTable${SubnetIndex}"
           SubnetId: !Ref
             Fn::Sub: "VpcPrivateSubnet${SubnetIndex}"
+
+      VpcPrivateSubnet${SubnetIndex}NatRoute:
+        Type: AWS::EC2::Route
+        Properties:
+          DestinationCidrBlock: "0.0.0.0/0"
+          NatGatewayId: !Ref
+            Fn::Sub: "VpcNatGateway${SubnetIndex}"
+          RouteTableId: !Ref
+            Fn::Sub: "VpcPrivateRouteTable${SubnetIndex}"
 
       VpcPublicSubnet${SubnetIndex}:
         Type: AWS::EC2::Subnet
@@ -139,6 +149,7 @@ Resources:
                 - AZsByIndex
                 - Values
                 - !Ref SubnetIndex
+          MapPublicIpOnLaunch: true
 
       VpcPublicRouteTable${SubnetIndex}:
         Type: AWS::EC2::RouteTable
@@ -161,28 +172,19 @@ Resources:
           SubnetId: !Ref
             Fn::Sub: "VpcPublicSubnet${SubnetIndex}"
 
-      VpcPublicSubnet${SubnetIndex}ElasticIP:
+      VpcNatPublicIP${SubnetIndex}:
         Type: AWS::EC2::EIP
         Properties:
           Domain: vpc
 
-      VpcPublicSubnet${SubnetIndex}NatGateway:
+      VpcNatGateway${SubnetIndex}:
         Type: AWS::EC2::NatGateway
         Properties:
           AllocationId: !GetAtt
-            - !Sub "VpcPublicSubnet${SubnetIndex}ElasticIP"
+            - !Sub "VpcNatPublicIP${SubnetIndex}"
             - AllocationId
           SubnetId: !Ref
             Fn::Sub: "VpcPublicSubnet${SubnetIndex}"
-
-      VpcPublicSubnet${SubnetIndex}NatRoute:
-        Type: "AWS::EC2::Route"
-        Properties:
-          DestinationCidrBlock: "0.0.0.0/0"
-          NatGatewayId: !Ref
-            Fn::Sub: "VpcPublicSubnet${SubnetIndex}NatGateway"
-          RouteTableId: !Ref
-            Fn::Sub:  VpcPrivateRouteTable${SubnetIndex}
 
   #####################
   # Load balancer
@@ -192,7 +194,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Type: application
-      Scheme: internet-facing
+      Scheme: internet-facing  # cannot be "internal" if we want to use as a CF origin
       Subnets:
         - !Ref VpcPublicSubnet1
         - !Ref VpcPublicSubnet2
@@ -327,23 +329,34 @@ Outputs:
     Value: !Ref ServicesCluster
     Export:
       Name: !Sub "${app}-services-cluster"
-  Subnet1Id:
-    Value: !Ref VpcPrivateSubnet1
-    Export:
-      Name: !Sub "${app}-vpc-subnet-1-id"
-  Subnet1CidrIp:
-    Value: !GetAtt VpcPrivateSubnet1.CidrBlock
-    Export:
-      Name: !Sub "${app}-vpc-subnet-1-cidr-ip"
-  Subnet2Id:
-    Value: !Ref VpcPrivateSubnet2
-    Export:
-      Name: !Sub "${app}-vpc-subnet-2-id"
-  Subnet2CidrIp:
-    Value: !GetAtt VpcPrivateSubnet2.CidrBlock
-    Export:
-      Name: !Sub "${app}-vpc-subnet-2-cidr-ip"
   VpcId:
     Value: !Ref Vpc
     Export:
       Name: !Sub "${app}-vpc-id"
+
+  Fn::ForEach::VpcOutputs:
+    - SubnetIndex
+    - - "1"  # must be string
+      - "2"
+    - PublicSubnet${SubnetIndex}Id:
+        Value: !Ref
+          Fn::Sub: "VpcPublicSubnet${SubnetIndex}"
+        Export:
+          Name: !Sub "${app}-vpc-public-subnet-${SubnetIndex}-id"
+      PublicSubnet${SubnetIndex}CidrIp:
+        Value: !GetAtt
+          - !Sub "VpcPublicSubnet${SubnetIndex}"
+          - CidrBlock
+        Export:
+          Name: !Sub "${app}-vpc-public-subnet-${SubnetIndex}-cidr-ip"
+      PrivateSubnet${SubnetIndex}Id:
+        Value: !Ref
+          Fn::Sub: "VpcPrivateSubnet${SubnetIndex}"
+        Export:
+          Name: !Sub "${app}-vpc-private-subnet-${SubnetIndex}-id"
+      PrivateSubnet${SubnetIndex}CidrIp:
+        Value: !GetAtt
+          - !Sub "VpcPrivateSubnet${SubnetIndex}"
+          - CidrBlock
+        Export:
+          Name: !Sub "${app}-vpc-private-subnet-${SubnetIndex}-cidr-ip"

@@ -21,6 +21,10 @@ Parameters:
     Type: Number
     Description: Seconds after which a new healthcheck cycle should be triggered
     Default: 60
+  maxInstances:
+    Type: Number
+    Description: The maximum autoscaling capacity
+    Default: 2
 
 Resources:
   Service:
@@ -35,11 +39,12 @@ Resources:
           TargetGroupArn: !Ref ServiceTargetGroup
       NetworkConfiguration:
         AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
           SecurityGroups:
             - !Ref ServiceSecurityGroup
           Subnets:
-            - Fn::ImportValue: !Sub "${app}-vpc-subnet-1-id"
-            - Fn::ImportValue: !Sub "${app}-vpc-subnet-2-id"
+            - Fn::ImportValue: !Sub "${app}-vpc-private-subnet-1-id"
+            - Fn::ImportValue: !Sub "${app}-vpc-private-subnet-2-id"
       DesiredCount: 1
       LaunchType: FARGATE
       DeploymentConfiguration:
@@ -51,7 +56,7 @@ Resources:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
     Properties:
       MinCapacity: 1
-      MaxCapacity: 2
+      MaxCapacity: !Ref maxInstances
       ResourceId: !Join
         - "/"
         - - service
@@ -92,12 +97,12 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref ServiceTargetGroup
       Conditions:
-        - Field: host-header
+        - Field: path-pattern
           Values:
-            - "bash.hu"
+            - "*"
       ListenerArn:
         Fn::ImportValue: !Sub "${app}-http-listener-arn"
-      Priority: 999
+      Priority: 666
 
   ServiceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -110,12 +115,12 @@ Resources:
           FromPort: !Ref port
           ToPort: !Ref port
           CidrIp:
-            Fn::ImportValue: !Sub "${app}-vpc-subnet-1-cidr-ip"
+            Fn::ImportValue: !Sub "${app}-vpc-public-subnet-1-cidr-ip"  # deliberately "public"
         - IpProtocol: tcp
           FromPort: !Ref port
           ToPort: !Ref port
           CidrIp:
-            Fn::ImportValue: !Sub "${app}-vpc-subnet-2-cidr-ip"
+            Fn::ImportValue: !Sub "${app}-vpc-public-subnet-1-cidr-ip"
       SecurityGroupEgress:
         - IpProtocol: "-1"
           CidrIp: "0.0.0.0/0"

@@ -29,7 +29,7 @@ function Combine-Path([Parameter(Position = 0)][string[]]$path) {
 
 function OpenSSL([Parameter(Position=0, Mandatory=$true)][string]$args) {
   Start-Process `
-    -FilePath (Combine-Path $Env:Programfiles, 'Git', 'usr', 'bin', 'openssl.exe') `
+    -FilePath (Combine-Path $Env:ProgramFiles, 'Git', 'usr', 'bin', 'openssl.exe') `
     -ArgumentList ${args} `
     -NoNewWindow `
     -Wait
