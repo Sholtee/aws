@@ -68,12 +68,16 @@ Resources:
       Runtime: nodejs18.x
       Timeout: 10
       MemorySize: 128
+    Metadata:
+      aws:cdk:path: Global/RouterLambda/Resource
 
   RouterLambdaVersion:
     Type: AWS::Lambda::Version
     Properties:
       Description: Lambda version. Lambda@Edge requires exact version
       FunctionName: !Ref RouterLambda
+    Metadata:
+      aws:cdk:path: Global/RouterLambda/Version
 
   RouterLambdaRole:
     Type: AWS::IAM::Role
@@ -110,6 +114,8 @@ Resources:
                 - iam:CreateServiceLinkedRole
                 - cloudfront:UpdateDistribution
               Resource: '*'
+    Metadata:
+      aws:cdk:path: Global/RouterLambda/Role
 
 Outputs:
   RouterLambdaArn:  # export among regions not supported

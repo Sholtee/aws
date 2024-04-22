@@ -26,6 +26,8 @@ Resources:
       BucketName: !Sub "${app}-frontend"
       VersioningConfiguration:
         Status: Enabled
+    Metadata:
+      aws:cdk:path: Foundation/S3/Resource
 
   FrontendBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -39,16 +41,12 @@ Resources:
             Resource: !Sub "${FrontendBucket.Arn}/*"
             Principal:
               AWS: !Sub "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOAI}"
+    Metadata:
+      aws:cdk:path: Foundation/S3/Policy
               
   ###################
   # CloudFront
   ###################
-
-  CloudFrontOAI:
-    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
-    Properties:
-      CloudFrontOriginAccessIdentityConfig:
-        Comment: !Sub "OAI for ${app}"
 
   CloudFrontDistro:
     Type: AWS::CloudFront::Distribution
@@ -58,7 +56,7 @@ Resources:
         HttpVersion: http2
         Origins:
           - DomainName: !GetAtt FrontendBucket.DomainName
-            Id: 'FrontendBucketOrigin'
+            Id: FrontendBucketOrigin
             S3OriginConfig:
               OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOAI}"
         CacheBehaviors:
@@ -68,8 +66,8 @@ Resources:
               - 'HEAD'
               - 'OPTIONS'
             ViewerProtocolPolicy: redirect-to-https
-            OriginRequestPolicyId: "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf" # Managed-CORS-S3Origin
-            CachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
+            OriginRequestPolicyId: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf # Managed-CORS-S3Origin
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
             TargetOriginId: FrontendBucketOrigin
             LambdaFunctionAssociations:
               - EventType: origin-request
@@ -80,8 +78,8 @@ Resources:
               - 'HEAD'
               - 'OPTIONS'
             ViewerProtocolPolicy: redirect-to-https
-            OriginRequestPolicyId: "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf" # Managed-CORS-S3Origin
-            CachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
+            OriginRequestPolicyId: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf # Managed-CORS-S3Origin
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
             TargetOriginId: FrontendBucketOrigin
         DefaultCacheBehavior:
           AllowedMethods:
@@ -89,17 +87,23 @@ Resources:
             - 'HEAD'
             - 'OPTIONS'
           ViewerProtocolPolicy: redirect-to-https
-          OriginRequestPolicyId: "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf" # Managed-CORS-S3Origin
-          CachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
+          OriginRequestPolicyId: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf # Managed-CORS-S3Origin
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
           LambdaFunctionAssociations:
             - EventType: origin-request
               LambdaFunctionARN: !GetAtt RouterLambdaArn.Value  # Will allow requests against "/" and "/index.html" only
           TargetOriginId: FrontendBucketOrigin
-          
-  ###################
-  # Global access
-  ###################        
-      
+    Metadata:
+      aws:cdk:path: Foundation/CloudFront/Resource
+
+  CloudFrontOAI:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub "OAI for ${app}"
+    Metadata:
+      aws:cdk:path: Foundation/CloudFront/OAI
+
   RouterLambdaArn:
     Type: AWS::CloudFormation::CustomResource
     Properties:
@@ -107,6 +111,12 @@ Resources:
       Stack: !Sub "${app}-globals"
       Export: !Sub "${app}-router-lambda-arn"
       ServiceToken: !GetAtt FetchGlobalOutputFunction.Arn
+    Metadata:
+      aws:cdk:path: Foundation/CloudFront/RouterLambdaArn
+
+  ###################
+  # Global access
+  ###################
 
   FetchGlobalOutputFunction:
     Type: AWS::Lambda::Function
@@ -144,6 +154,8 @@ Resources:
       Role: !GetAtt FetchGlobalOutputFunctionExecutionRole.Arn
       MemorySize: 128
       Timeout: 20
+    Metadata:
+      aws:cdk:path: Foundation/FetchGlobalOutputFunction/Resource
 
   FetchGlobalOutputFunctionExecutionRole:
     Type: AWS::IAM::Role
@@ -174,3 +186,5 @@ Resources:
                 Action:
                   - cloudformation:DescribeStacks
                 Resource: '*'
+    Metadata:
+      aws:cdk:path: Foundation/FetchGlobalOutputFunction/Role
