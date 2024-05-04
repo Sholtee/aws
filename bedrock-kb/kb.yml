@@ -205,7 +205,7 @@ Resources:
       Role: !GetAtt OpenSearchIndexUpdaterLambdaRole.Arn
       Environment:
         Variables:
-          REGION: !Ref "AWS::Region"
+          REGION: !Ref AWS::Region
           OS_ENDPOINT: !GetAtt OpenSearchCollection.CollectionEndpoint
           ADMIN_KEY: !Ref OpenSearchAdminCredentials
           ADMIN_SECRET: !GetAtt OpenSearchAdminCredentials.SecretAccessKey
@@ -228,6 +228,106 @@ Resources:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
     Metadata:
       aws:cdk:path: KB/OpenSearch/Index/UpdaterLambda/Role
+
+  ##########################
+  # Knowledge base
+  ##########################
+
+  KnowledgeBaseCommonProperties:
+    Type: AWS::DynamoDB::Table
+    Description: Table containing the common properties such as last update time
+    Properties:
+      TableName: !Sub "${app}-kb-common-properties"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+    Metadata:
+      aws:cdk:path: KB/KnowledgeBase/Properties
+
+  KnowledgeBaseDataBucket:
+    Type: AWS::S3::Bucket
+    DependsOn: KnowledgeBaseDataBucketEventSinkLambdaPermission  # required for NotificationConfiguration
+    Properties:
+      BucketName: !Sub "${app}-kb-data-bucket"
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Function: !GetAtt KnowledgeBaseDataBucketEventSinkLambda.Arn
+          - Event: s3:ObjectRemoved:*
+            Function: !GetAtt KnowledgeBaseDataBucketEventSinkLambda.Arn
+    Metadata:
+      aws:cdk:path: KB/KnowledgeBase/Data/Resource
+
+  KnowledgeBaseDataBucketEventSinkLambda:
+    Type: AWS::Lambda::Function
+    Description: Lambda processing the data bucket events
+    Properties:
+      Code:
+        ZipFile: !Sub |
+          const
+            {DynamoDBClient, PutItemCommand} = require('@aws-sdk/client-dynamodb'),
+            client = new DynamoDBClient();
+          
+          exports.handler = async function(event, context) {
+            console.log(event);
+            await client.send(new PutItemCommand({
+              Item: {
+                id: {S: 'data-bucket-props'},
+                event: {S: event['Records'][0]['eventName']},
+                timestamp: {N: new Date().getTime().toString()}
+              },
+              TableName: '${KnowledgeBaseCommonProperties}'
+            }));
+          };
+      FunctionName: !Sub "${app}-kb-data-bucket-event-sink"
+      Handler: index.handler
+      Role: !GetAtt KnowledgeBaseDataBucketEventSinkLambdaRole.Arn
+      Runtime: nodejs18.x
+      Timeout: 30
+      MemorySize: 128
+    Metadata:
+      aws:cdk:path: KB/KnowledgeBase/Data/EventSink/Resource
+
+  KnowledgeBaseDataBucketEventSinkLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+      Policies:
+        - PolicyName: allowDbAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: !GetAtt KnowledgeBaseCommonProperties.Arn
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    Metadata:
+      aws:cdk:path: KB/KnowledgeBase/Data/EventSink/Role
+
+  KnowledgeBaseDataBucketEventSinkLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref KnowledgeBaseDataBucketEventSinkLambda
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub "arn:aws:s3:::${app}-kb-data-bucket"  # we cannot use "!GetAtt KnowledgeBaseDataBucket.Arn" here to avoid circular reference
+      SourceAccount: !Ref AWS::AccountId
+    Metadata:
+      aws:cdk:path: KB/KnowledgeBase/Data/EventSink/Permission
 
   ##########################
   # Bedrock
@@ -255,5 +355,16 @@ Resources:
                   - aoss:APIAccessAll
                 Resource:
                   - !GetAtt OpenSearchCollection.Arn
+        - PolicyName: allowS3ReadOnlyAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt KnowledgeBaseDataBucket.Arn
+                  - !Sub "${KnowledgeBaseDataBucket.Arn}/*"
     Metadata:
       aws:cdk:path: KB/Bedrock/ExecutionRole
