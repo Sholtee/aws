@@ -372,6 +372,118 @@ Resources:
     Metadata:
       aws:cdk:path: KB/KnowledgeBase/Data/EventSink/Permission
 
+  KnowledgeBaseDataIngestionInitiatorLambda:
+    Type: AWS::Lambda::Function
+    Description: Scheduled lambda that initiates a new KB ingestion job if the data bucket has been changed
+    Properties:
+      Code:
+        ZipFile: !Sub |
+          const
+            {BedrockAgentClient, StartIngestionJobCommand} = require('@aws-sdk/client-bedrock-agent'),
+            {DynamoDBClient, GetItemCommand, PutItemCommand} = require('@aws-sdk/client-dynamodb'),
+            client = new DynamoDBClient();
+          
+          exports.handler = async function(event, context) {
+            console.log('Querying properties...');
+            
+            const
+              ingestionProps = (
+                await client.send(
+                  new GetItemCommand({ Key: { id: {S: 'ingestion-props'} }, TableName: '${KnowledgeBaseCommonProperties}' })
+                )
+              )['Item'],
+              bucketProps = (
+                await client.send(
+                  new GetItemCommand({ Key: { id: {S: 'data-bucket-props'} }, TableName: '${KnowledgeBaseCommonProperties}' })
+                )
+              )['Item'];
+          
+            if (!bucketProps)
+              return;  // nothing was uploaded yet
+          
+            if (!ingestionProps || (parseInt(bucketProps.timestamp.N) > parseInt(ingestionProps.timestamp.N))) {
+              console.log('Initiating new ingestion job...');
+          
+              const resp = await new BedrockAgentClient().send(new StartIngestionJobCommand({
+                knowledgeBaseId: '${KnowledgeBase}',
+                dataSourceId: '${KnowledgeBaseDataSource.DataSourceId}'
+              }));
+              console.log(resp);
+                      
+              await client.send(new PutItemCommand({
+                Item: {
+                  id: {S: 'ingestion-props'},
+                  timestamp: {N: new Date().getTime().toString()}
+                },
+                TableName: '${KnowledgeBaseCommonProperties}'
+              }));
+            }    
+          };
+      FunctionName: !Sub "${app}-kb-data-ingestion-initiator"
+      Handler: index.handler
+      Role: !GetAtt KnowledgeBaseDataIngestionInitiatorLambdaRole.Arn
+      Runtime: nodejs18.x
+      Timeout: 30
+      MemorySize: 128
+    Metadata:
+      aws:cdk:path: KB/KnowledgeBase/Data/IngestionInitiator/Resource
+
+  KnowledgeBaseDataIngestionInitiatorLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+      Policies:
+        - PolicyName: allowBedrockAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:StartIngestionJob
+                Resource: !GetAtt KnowledgeBase.KnowledgeBaseArn
+        - PolicyName: allowDbAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                Resource: !GetAtt KnowledgeBaseCommonProperties.Arn
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    Metadata:
+      aws:cdk:path: KB/KnowledgeBase/Data/IngestionInitiator/Role
+
+  KnowledgeBaseDataIngestionInitiatorLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref KnowledgeBaseDataIngestionInitiatorLambda
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt KnowledgeBaseDataIngestionInitiatorLambdaSchedule.Arn
+      SourceAccount: !Ref AWS::AccountId
+    Metadata:
+      aws:cdk:path: KB/KnowledgeBase/Data/IngestionInitiator/Permission
+
+  KnowledgeBaseDataIngestionInitiatorLambdaSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(10 minutes)
+      Targets:
+        - Id: KnowledgeBaseDataIngestionInitiatorLambdaSchedule
+          Arn: !GetAtt KnowledgeBaseDataIngestionInitiatorLambda.Arn
+    Metadata:
+      aws:cdk:path: KB/KnowledgeBase/Data/IngestionInitiator/Schedule
+
   ##########################
   # Bedrock
   ##########################
