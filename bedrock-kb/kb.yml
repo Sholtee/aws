@@ -10,6 +10,10 @@ Parameters:
     Type: String
     Description: The application name (including prefix)
     MaxLength: '32'
+  embeddingModel:
+    Type: String
+    Description: Embedding model name
+    Default: amazon.titan-embed-text-v1
 
 Resources:
   ##########################
@@ -92,7 +96,7 @@ Resources:
     Type: AWS::OpenSearchServerless::AccessPolicy
     Properties:
       Name: !Sub "${app}-os-data-access-policy"
-      Policy: !Sub '[{"Rules":[{"Resource":["collection/${app}-os-collection"],"Permission":["aoss:CreateCollectionItems","aoss:DeleteCollectionItems","aoss:UpdateCollectionItems","aoss:DescribeCollectionItems"],"ResourceType":"collection"},{"Resource":["index/${app}-os-collection/*"],"Permission":["aoss:CreateIndex","aoss:DeleteIndex","aoss:UpdateIndex","aoss:DescribeIndex","aoss:ReadDocument","aoss:WriteDocument"],"ResourceType":"index"}],"Principal":["${BedrockExecutionRole.Arn}","${OpenSearchAdmin.Arn}"],"Description":"-"}]'
+      Policy: !Sub '[{"Rules":[{"Resource":["collection/${app}-os-collection"],"Permission":["aoss:CreateCollectionItems","aoss:DeleteCollectionItems","aoss:UpdateCollectionItems","aoss:DescribeCollectionItems"],"ResourceType":"collection"},{"Resource":["index/${app}-os-collection/*"],"Permission":["aoss:CreateIndex","aoss:DeleteIndex","aoss:UpdateIndex","aoss:DescribeIndex","aoss:ReadDocument","aoss:WriteDocument"],"ResourceType":"index"}],"Principal":["${BedrockExecutionRole.Arn}","${OpenSearchAdmin.Arn}","arn:aws:iam::${AWS::AccountId}:root"],"Description":"-"}]'
       Type: data
     Metadata:
       aws:cdk:path: KB/OpenSearch/Policy/DataAccessPolicy
@@ -233,6 +237,45 @@ Resources:
   # Knowledge base
   ##########################
 
+  KnowledgeBase:
+    Type: AWS::Bedrock::KnowledgeBase
+    Properties:
+      Name: !Sub "${app}-kb"
+      RoleArn: !GetAtt BedrockExecutionRole.Arn
+      KnowledgeBaseConfiguration:
+        Type: VECTOR
+        VectorKnowledgeBaseConfiguration:
+          EmbeddingModelArn: !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${embeddingModel}"
+      StorageConfiguration:
+        Type: OPENSEARCH_SERVERLESS
+        OpensearchServerlessConfiguration:
+          CollectionArn: !GetAtt OpenSearchCollection.Arn
+          VectorIndexName: !GetAtt OpenSearchIndex.IndexName
+          FieldMapping:  # field names are defined in OpenSearchIndex.Parameters
+            MetadataField: text_metadata_field
+            TextField: text_field
+            VectorField: vector_field
+    Metadata:
+      aws:cdk:path: KB/KnowledgeBase/Resource
+
+  KnowledgeBaseDataSource:
+    Type: AWS::Bedrock::DataSource
+    Properties:
+      Name: !Sub "${app}-kb-datasource"
+      KnowledgeBaseId: !Ref KnowledgeBase
+      DataSourceConfiguration:
+        Type: S3
+        S3Configuration:
+          BucketArn: !GetAtt KnowledgeBaseDataBucket.Arn
+      VectorIngestionConfiguration:
+        ChunkingConfiguration:
+          ChunkingStrategy: FIXED_SIZE
+          FixedSizeChunkingConfiguration:
+            MaxTokens: 4000
+            OverlapPercentage: 5
+    Metadata:
+      aws:cdk:path: KB/KnowledgeBase/Data/Source
+
   KnowledgeBaseCommonProperties:
     Type: AWS::DynamoDB::Table
     Description: Table containing the common properties such as last update time
@@ -366,5 +409,13 @@ Resources:
                 Resource:
                   - !GetAtt KnowledgeBaseDataBucket.Arn
                   - !Sub "${KnowledgeBaseDataBucket.Arn}/*"
+        - PolicyName: allowModelInvocation
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource: !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${embeddingModel}"
     Metadata:
       aws:cdk:path: KB/Bedrock/ExecutionRole
