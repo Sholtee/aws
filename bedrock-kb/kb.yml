@@ -258,24 +258,6 @@ Resources:
     Metadata:
       aws:cdk:path: KB/KnowledgeBase/Resource
 
-  KnowledgeBaseDataSource:
-    Type: AWS::Bedrock::DataSource
-    Properties:
-      Name: !Sub "${app}-kb-datasource"
-      KnowledgeBaseId: !Ref KnowledgeBase
-      DataSourceConfiguration:
-        Type: S3
-        S3Configuration:
-          BucketArn: !GetAtt KnowledgeBaseDataBucket.Arn
-      VectorIngestionConfiguration:
-        ChunkingConfiguration:
-          ChunkingStrategy: FIXED_SIZE
-          FixedSizeChunkingConfiguration:
-            MaxTokens: 4000
-            OverlapPercentage: 5
-    Metadata:
-      aws:cdk:path: KB/KnowledgeBase/Data/Source
-
   KnowledgeBaseCommonProperties:
     Type: AWS::DynamoDB::Table
     Description: Table containing the common properties such as last update time
@@ -304,6 +286,24 @@ Resources:
             Function: !GetAtt KnowledgeBaseDataBucketEventSinkLambda.Arn
     Metadata:
       aws:cdk:path: KB/KnowledgeBase/Data/Resource
+
+  KnowledgeBaseDataSource:
+    Type: AWS::Bedrock::DataSource
+    Properties:
+      Name: !Sub "${app}-kb-datasource"
+      KnowledgeBaseId: !Ref KnowledgeBase
+      DataSourceConfiguration:
+        Type: S3
+        S3Configuration:
+          BucketArn: !GetAtt KnowledgeBaseDataBucket.Arn
+      VectorIngestionConfiguration:
+        ChunkingConfiguration:
+          ChunkingStrategy: FIXED_SIZE
+          FixedSizeChunkingConfiguration:
+            MaxTokens: 4000
+            OverlapPercentage: 5
+    Metadata:
+      aws:cdk:path: KB/KnowledgeBase/Data/Source
 
   KnowledgeBaseDataBucketEventSinkLambda:
     Type: AWS::Lambda::Function
