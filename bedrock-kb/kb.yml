@@ -1,0 +1,127 @@
+#####################################################
+# kb.yml
+#
+# Author: Denes Solti
+#####################################################
+Description: Knowledge base infrastructure.
+
+Parameters:
+  app:
+    Type: String
+    Description: The application name (including prefix)
+    MaxLength: '32'
+
+Resources:
+  ##########################
+  # OpenSearch
+  ##########################
+
+  OpenSearchCollection:
+    Type: AWS::OpenSearchServerless::Collection
+    DependsOn: OpenSearchEncryptionPolicy
+    Properties:
+      Description: OpenSearch collection
+      Name: !Sub "${app}-os-collection"
+      Type: VECTORSEARCH
+    Metadata:
+      aws:cdk:path: KB/OpenSearch/Resource
+
+  OpenSearchAdmin:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: OpenSearchAdmin
+    Metadata:
+      aws:cdk:path: KB/OpenSearch/Admin/Resource
+
+  OpenSearchAdminCredentials:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      Status: Active
+      UserName: !Ref OpenSearchAdmin
+    Metadata:
+      aws:cdk:path: KB/OpenSearch/Admin/Credentials
+
+  OpenSearchAdminGroup:
+    Type: AWS::IAM::Group
+    Metadata:
+      aws:cdk:path: KB/OpenSearch/Admin/Group
+
+  OpenSearchAdminPolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: OpenSearchAdmins
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: aoss:*
+            Resource: "*"
+      Groups:
+        - !Ref OpenSearchAdminGroup
+    Metadata:
+      aws:cdk:path: KB/OpenSearch/Admin/Policies
+
+  OpenSearchAdmins:
+    Type: AWS::IAM::UserToGroupAddition
+    Properties:
+      GroupName: !Ref OpenSearchAdminGroup
+      Users:
+        - !Ref OpenSearchAdmin
+    Metadata:
+      aws:cdk:path: KB/OpenSearch/Admin/UserToGroupAddition
+
+  OpenSearchEncryptionPolicy:
+    Type: AWS::OpenSearchServerless::SecurityPolicy
+    Properties:
+      Name: !Sub "${app}-os-encryption-policy"
+      Policy: !Sub '{"Rules":[{"Resource":["collection/${app}-os-collection"],"ResourceType":"collection"}],"AWSOwnedKey":true}'
+      Type: encryption
+    Metadata:
+      aws:cdk:path: KB/OpenSearch/Policy/EncryptionPolicy
+
+  OpenSearchNetworkPolicy:
+    Type: AWS::OpenSearchServerless::SecurityPolicy
+    Properties:
+      Name: !Sub "${app}-os-network-policy"
+      Policy: !Sub '[{"Rules":[{"Resource":["collection/${app}-os-collection"],"ResourceType":"collection"}],"AllowFromPublic":true}]'
+      Type: network
+    Metadata:
+      aws:cdk:path: KB/OpenSearch/Policy/NetworkPolicy
+
+  OpenSearchDataAccessPolicy:
+    Type: AWS::OpenSearchServerless::AccessPolicy
+    Properties:
+      Name: !Sub "${app}-os-data-access-policy"
+      Policy: !Sub '[{"Rules":[{"Resource":["collection/${app}-os-collection"],"Permission":["aoss:CreateCollectionItems","aoss:DeleteCollectionItems","aoss:UpdateCollectionItems","aoss:DescribeCollectionItems"],"ResourceType":"collection"},{"Resource":["index/${app}-os-collection/*"],"Permission":["aoss:CreateIndex","aoss:DeleteIndex","aoss:UpdateIndex","aoss:DescribeIndex","aoss:ReadDocument","aoss:WriteDocument"],"ResourceType":"index"}],"Principal":["${BedrockExecutionRole.Arn}","${OpenSearchAdmin.Arn}"],"Description":"-"}]'
+      Type: data
+    Metadata:
+      aws:cdk:path: KB/OpenSearch/Policy/DataAccessPolicy
+
+  ##########################
+  # Bedrock
+  ##########################
+
+  BedrockExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - bedrock.amazonaws.com
+      Policies:
+        - PolicyName: allowOpenSearchApiAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - aoss:APIAccessAll
+                Resource:
+                  - !GetAtt OpenSearchCollection.Arn
+    Metadata:
+      aws:cdk:path: KB/Bedrock/ExecutionRole
