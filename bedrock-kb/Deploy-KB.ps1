@@ -28,4 +28,4 @@ aws cloudformation ${action}-stack `
   --region ${region} `
   --template-body file://./kb.yml `
   --parameters "ParameterKey=app,ParameterValue=${app}" `
-  --capabilities CAPABILITY_NAMED_IAM
+  --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND

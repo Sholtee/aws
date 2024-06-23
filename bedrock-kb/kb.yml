@@ -5,6 +5,8 @@
 #####################################################
 Description: Knowledge base infrastructure.
 
+Transform: AWS::LanguageExtensions
+
 Parameters:
   app:
     Type: String
@@ -78,7 +80,13 @@ Resources:
     Type: AWS::OpenSearchServerless::SecurityPolicy
     Properties:
       Name: !Sub "${app}-os-encryption-policy"
-      Policy: !Sub '{"Rules":[{"Resource":["collection/${app}-os-collection"],"ResourceType":"collection"}],"AWSOwnedKey":true}'
+      Policy:
+        Fn::ToJsonString:
+          Rules:
+            - Resource:
+                - !Sub "collection/${app}-os-collection"  # name of OpenSearchCollection
+              ResourceType: collection
+          AWSOwnedKey: true
       Type: encryption
     Metadata:
       aws:cdk:path: KB/OpenSearch/Policy/EncryptionPolicy
@@ -87,7 +95,13 @@ Resources:
     Type: AWS::OpenSearchServerless::SecurityPolicy
     Properties:
       Name: !Sub "${app}-os-network-policy"
-      Policy: !Sub '[{"Rules":[{"Resource":["collection/${app}-os-collection"],"ResourceType":"collection"}],"AllowFromPublic":true}]'
+      Policy:
+        Fn::ToJsonString:
+          - Rules:
+              - Resource:
+                  - !Sub "collection/${app}-os-collection"
+                ResourceType: collection
+            AllowFromPublic: true
       Type: network
     Metadata:
       aws:cdk:path: KB/OpenSearch/Policy/NetworkPolicy
@@ -96,7 +110,32 @@ Resources:
     Type: AWS::OpenSearchServerless::AccessPolicy
     Properties:
       Name: !Sub "${app}-os-data-access-policy"
-      Policy: !Sub '[{"Rules":[{"Resource":["collection/${app}-os-collection"],"Permission":["aoss:CreateCollectionItems","aoss:DeleteCollectionItems","aoss:UpdateCollectionItems","aoss:DescribeCollectionItems"],"ResourceType":"collection"},{"Resource":["index/${app}-os-collection/*"],"Permission":["aoss:CreateIndex","aoss:DeleteIndex","aoss:UpdateIndex","aoss:DescribeIndex","aoss:ReadDocument","aoss:WriteDocument"],"ResourceType":"index"}],"Principal":["${BedrockExecutionRole.Arn}","${OpenSearchAdmin.Arn}","arn:aws:iam::${AWS::AccountId}:root"],"Description":"-"}]'
+      Policy:
+        Fn::ToJsonString:
+          - Rules:
+              - Resource:
+                  - !Sub "collection/${app}-os-collection"
+                Permission:
+                  - aoss:CreateCollectionItems
+                  - aoss:DeleteCollectionItems
+                  - aoss:UpdateCollectionItems
+                  - aoss:DescribeCollectionItems
+                ResourceType: collection
+              - Resource:
+                  - !Sub "index/${app}-os-collection/*"
+                Permission:
+                  - aoss:CreateIndex
+                  - aoss:DeleteIndex
+                  - aoss:UpdateIndex
+                  - aoss:DescribeIndex
+                  - aoss:ReadDocument
+                  - aoss:WriteDocument
+                ResourceType: index
+            Principal:
+              - !GetAtt BedrockExecutionRole.Arn
+              - !GetAtt OpenSearchAdmin.Arn
+              - !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Description: "-"
       Type: data
     Metadata:
       aws:cdk:path: KB/OpenSearch/Policy/DataAccessPolicy
