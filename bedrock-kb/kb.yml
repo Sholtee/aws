@@ -24,7 +24,7 @@ Resources:
 
   OpenSearchCollection:
     Type: AWS::OpenSearchServerless::Collection
-    DependsOn: OpenSearchEncryptionPolicy
+    DependsOn: OpenSearchEncryptionPolicy  # EncryptionPolicy must exist for this collection
     Properties:
       Description: OpenSearch collection
       Name: !Sub "${app}-os-collection"
