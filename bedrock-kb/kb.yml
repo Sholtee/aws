@@ -143,6 +143,7 @@ Resources:
   OpenSearchIndex:
     Type: AWS::CloudFormation::CustomResource
     DependsOn:
+      - OpenSearchNetworkPolicy
       - OpenSearchDataAccessPolicy
     Properties:
       IndexName: !Sub "${app}-os-index"
@@ -219,17 +220,34 @@ Resources:
                 });
             
               switch (RequestType) {
-                case 'Create':
+                case 'Create': {
                   console.log('Creating new index...');
-                  const response = await client.indices.create({
-                    index: IndexName,
-                    body: JSON.stringify(Parameters)
-                  });
-                  console.log(response);
+                  for (let attempts = 0; attempts < 4; attempts++) {
+                    try {
+                      const response = await client.indices.create({
+                        index: IndexName,
+                        body: JSON.stringify(Parameters)
+                      });
+                      console.log(response);
+                      break;
+                    } catch (err) {
+                      if (err.toString().includes('authorization_exception')) {
+                        console.warn(err);
+                        await sleep(20000 * attempts);
+                        continue;
+                      }
+                      raise;
+                    }
+                  }
               
                   // index creation can take up to a minute
-                  await new Promise(cb => setTimeout(cb, 60000));
+                  await sleep(60000);
                   break;
+          
+                  function sleep(ms) {
+                    return new Promise(cb => setTimeout(cb, ms));
+                  }
+                }
               }
             
               await send(event, context, SUCCESS, {
@@ -243,7 +261,7 @@ Resources:
       FunctionName: !Sub "${app}-os-index-updater"
       Runtime: nodejs18.x
       Handler: index.handler
-      Timeout: 120
+      Timeout: 180
       MemorySize: 128
       Role: !GetAtt OpenSearchIndexUpdaterLambdaRole.Arn
       Environment:
