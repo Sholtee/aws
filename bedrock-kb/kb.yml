@@ -222,7 +222,7 @@ Resources:
               switch (RequestType) {
                 case 'Create': {
                   console.log('Creating new index...');
-                  for (let attempts = 0; attempts < 4; attempts++) {
+                  for (let attempts = 1; attempts < 4; attempts++) {
                     try {
                       const response = await client.indices.create({
                         index: IndexName,
