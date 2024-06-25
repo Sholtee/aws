@@ -233,20 +233,13 @@ Resources:
                     } catch (err) {
                       if (err.toString().includes('authorization_exception')) {
                         console.warn(err);
-                        await sleep(20000 * attempts);
+                        await new Promise(cb => setTimeout(cb, 20000 * attempts));
                         continue;
                       }
                       raise;
                     }
                   }
-              
-                  // index creation can take up to a minute
-                  await sleep(60000);
                   break;
-          
-                  function sleep(ms) {
-                    return new Promise(cb => setTimeout(cb, ms));
-                  }
                 }
               }
             
