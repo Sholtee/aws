@@ -243,7 +243,7 @@ Resources:
                 }
               }
             
-              // index creation can take up to a minute
+              // index modification can take up to a minute
               await sleep(60000);
             
               await send(event, context, SUCCESS, {
