@@ -369,8 +369,7 @@ Resources:
             console.log(event);
             await client.send(new PutItemCommand({
               Item: {
-                id: {S: 'data-bucket-props'},
-                event: {S: event['Records'][0]['eventName']},
+                id: {S: 'bucket-modified'},
                 timestamp: {N: new Date().getTime().toString()}
               },
               TableName: '${KnowledgeBaseCommonProperties}'
@@ -437,21 +436,21 @@ Resources:
             console.log('Querying properties...');
             
             const
-              ingestionProps = (
+              ingestionRun = (
                 await client.send(
-                  new GetItemCommand({ Key: { id: {S: 'ingestion-props'} }, TableName: '${KnowledgeBaseCommonProperties}' })
+                  new GetItemCommand({ Key: { id: {S: 'ingestion-run'} }, TableName: '${KnowledgeBaseCommonProperties}' })
                 )
               )['Item'],
-              bucketProps = (
+              bucketModified = (
                 await client.send(
-                  new GetItemCommand({ Key: { id: {S: 'data-bucket-props'} }, TableName: '${KnowledgeBaseCommonProperties}' })
+                  new GetItemCommand({ Key: { id: {S: 'bucket-modified'} }, TableName: '${KnowledgeBaseCommonProperties}' })
                 )
               )['Item'];
           
-            if (!bucketProps)
+            if (!bucketModified)
               return;  // nothing was uploaded yet
           
-            if (!ingestionProps || (parseInt(bucketProps.timestamp.N) > parseInt(ingestionProps.timestamp.N))) {
+            if (!ingestionRun || (parseInt(bucketModified.timestamp.N) > parseInt(ingestionRun.timestamp.N))) {
               console.log('Initiating new ingestion job...');
           
               const resp = await new BedrockAgentClient().send(new StartIngestionJobCommand({
@@ -462,7 +461,7 @@ Resources:
                       
               await client.send(new PutItemCommand({
                 Item: {
-                  id: {S: 'ingestion-props'},
+                  id: {S: 'ingestion-run'},
                   timestamp: {N: new Date().getTime().toString()}
                 },
                 TableName: '${KnowledgeBaseCommonProperties}'
