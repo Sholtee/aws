@@ -236,7 +236,7 @@ Resources:
                         await new Promise(cb => setTimeout(cb, 20000 * attempts));
                         continue;
                       }
-                      raise;
+                      throw;
                     }
                   }
                   break;
