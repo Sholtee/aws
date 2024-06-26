@@ -222,7 +222,7 @@ Resources:
               switch (RequestType) {
                 case 'Create': {
                   console.log('Creating new index...');
-                  for (let attempts = 1; attempts < 4; attempts++) {
+                  for (let attempts = 1; ; attempts++) {
                     try {
                       const response = await client.indices.create({
                         index: IndexName,
@@ -231,17 +231,20 @@ Resources:
                       console.log(response);
                       break;
                     } catch (err) {
-                      if (err.toString().includes('authorization_exception')) {
+                      if (err.toString().includes('authorization_exception') && attempts < 4) {
                         console.warn(err);
-                        await new Promise(cb => setTimeout(cb, 20000 * attempts));
+                        await sleep(20000 * attempts);
                         continue;
                       }
-                      throw;
+                      throw err;
                     }
                   }
                   break;
                 }
               }
+            
+              // index creation can take up to a minute
+              await sleep(60000);
             
               await send(event, context, SUCCESS, {
                 IndexName
@@ -251,6 +254,10 @@ Resources:
               await send(event, context, FAILED, null);
             }
           };
+          
+          function sleep(ms) {
+            return new Promise(cb => setTimeout(cb, ms));
+          }
       FunctionName: !Sub "${app}-os-index-updater"
       Runtime: nodejs18.x
       Handler: index.handler
