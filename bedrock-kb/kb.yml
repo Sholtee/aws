@@ -15,7 +15,7 @@ Parameters:
   embeddingModel:
     Type: String
     Description: Embedding model name
-    Default: amazon.titan-embed-text-v1
+    Default: amazon.titan-embed-text-v2:0
 
 Resources:
   ##########################
@@ -157,7 +157,7 @@ Resources:
           properties:
             vector_field:
               type: knn_vector
-              dimension: 1536
+              dimension: 1024
               method:
                 name: hnsw
                 engine: faiss
@@ -229,6 +229,8 @@ Resources:
                         body: JSON.stringify(Parameters)
                       });
                       console.log(response);
+                      // index creation can take up to a minute
+                      await sleep(60000);
                       break;
                     } catch (err) {
                       if (err.toString().includes('authorization_exception') && attempts < 4) {
@@ -242,10 +244,7 @@ Resources:
                   break;
                 }
               }
-            
-              // index modification can take up to a minute
-              await sleep(60000);
-            
+
               await send(event, context, SUCCESS, {
                 IndexName
               });
