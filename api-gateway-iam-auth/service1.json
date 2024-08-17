@@ -1,0 +1,4 @@
+{
+  "app": "api-gateway-test",
+  "externalClientArns": "arn:aws:iam::012345678900:user/test"
+}
