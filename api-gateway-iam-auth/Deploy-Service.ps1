@@ -53,5 +53,12 @@ Invoke-Expression ("aws cloudformation ${action}-stack "            +
   "--region ${region} "                                             +
   "--template-body `"file://./${service}.yml`" "                    +
   "--parameters ${params} "                                         +
-  "--capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND "
+  "--capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
 )
+aws cloudformation wait stack-${action}-complete --region ${region} --stack-name ${stackName}
+
+aws cloudformation describe-stacks `
+    --stack-name ${stackName} `
+    --region ${region} `
+    --query "Stacks[0].Outputs[?OutputKey=='Url'].OutputValue" `
+    --output text

@@ -55,7 +55,7 @@ Resources:
       MemorySize: 128
 
   serviceLambdaLogGroup:
-    Type: "AWS::Logs::LogGroup"
+    Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/lambda/${AWS::StackName}"
       RetentionInDays: 90
@@ -218,7 +218,6 @@ Resources:
     Properties:
       RestApiId: !Ref serviceApi
       ContentType: application/json
-      Description: Model for token request
       Name: RequestModel
       Schema:
         $schema: http://json-schema.org/draft-04/schema#
