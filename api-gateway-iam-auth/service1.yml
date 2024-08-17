@@ -24,10 +24,20 @@ Parameters:
     Type: String
     Description: API stage, for instance "dev", "test" or "prod"
     Default: test
+    AllowedValues:
+      - dev
+      - test
+      - prod
   httpMethod:
     Type: String
     Description: The HTTP method to be used
     Default: POST
+
+Conditions:
+  verboseError: !Not
+    - !Equals
+      - !Ref stage
+      - prod
 
 Resources:
   serviceLambda:
@@ -51,7 +61,7 @@ Resources:
       RetentionInDays: 90
 
   serviceLambdaRole:
-    Type: "AWS::IAM::Role"
+    Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -163,9 +173,23 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
           - StatusCode: 400
-            SelectionPattern: Malformed input
+            SelectionPattern: ^\[400\] (.|\r|\n)*$
+            ResponseTemplates: !If
+              - verboseError
+              - !Ref AWS::NoValue
+              - application/json: |
+                  {
+                    "errorMessage": $input.json('$.errorMessage')
+                  }
           - StatusCode: 500
-            SelectionPattern: Error
+            SelectionPattern: ^\[500]\ (.|\r|\n)*$
+            ResponseTemplates: !If
+              - verboseError
+              - !Ref AWS::NoValue
+              - application/json: |
+                  {
+                    "errorMessage": $input.json('$.errorMessage')
+                  }
         RequestTemplates:
           application/json: |
             #set($inputRoot = $input.path('$'))
@@ -183,11 +207,13 @@ Resources:
       RestApiId: !Ref serviceApi
       RequestValidatorId: !Ref serviceRequestValidator
       RequestModels:
-        application/json : !Ref serviceRequestMode
+        application/json : !Ref serviceRequestModel
       MethodResponses:
         - StatusCode: 200
+        - StatusCode: 400
+        - StatusCode: 500
 
-  serviceRequestMode:
+  serviceRequestModel:
     Type: AWS::ApiGateway::Model
     Properties:
       RestApiId: !Ref serviceApi
