@@ -30,7 +30,7 @@ $functionName = "$($configJson.app)-${service}-lambda"
 $stackName = "$($configJson.app)-${service}"
 
 $configJson.PSObject.Properties | ForEach-Object `
-  -Begin {$params="`"ParameterKey=app,ParameterValue=$($configJson.app)`" `"ParameterKey=functionName,ParameterValue=${functionName}`" "} `
+  -Begin {$params="`"ParameterKey=functionName,ParameterValue=${functionName}`" "} `
   -Process {$params += " `"ParameterKey=$($_.Name),ParameterValue=$($_.Value)`""}
 
 $stackId = Invoke-Expression ("aws cloudformation ${action}-stack " +
