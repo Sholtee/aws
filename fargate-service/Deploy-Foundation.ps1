@@ -3,7 +3,7 @@
 #
 # Author: Denes Solti
 #
-# Usage: Deploy-Foundation.ps1 -action [create|update] -app app-name -region region-name -profile profile-name
+# Usage: Deploy-Foundation.ps1 -action [create|update] -app app-name -certificateArn certificate-arn -region region-name -profile profile-name
 #
 
 param(
