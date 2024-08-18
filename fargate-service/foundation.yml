@@ -14,7 +14,7 @@ Parameters:
     MaxLength: '32'
   certificateArn:
     Type: String
-    Description: Certificate to be used in HTTPListener
+    Description: Certificate to be used by the HTTPListener
   dbName:
     Type: String
     Description: Name of the application database
@@ -28,33 +28,37 @@ Mappings:
       "2": b
 
 Resources:
-  CloudFrontDistro:
-    Type: AWS::CloudFront::Distribution
-    Properties:
-      DistributionConfig:
-        Enabled: true
-        HttpVersion: http2
-        Origins:
-          - DomainName: !GetAtt LoadBalancer.DNSName
-            Id: 'LoadBalancerOrigin'
-            CustomOriginConfig:
-              OriginProtocolPolicy: https-only
-              OriginSSLProtocols:
-                - TLSv1.2
-              OriginReadTimeout: 60
-        DefaultCacheBehavior:
-          AllowedMethods:
-            - 'HEAD'
-            - 'GET'
-            - 'OPTIONS'
-            - 'PUT'
-            - 'PATCH'
-            - 'POST'
-            - 'DELETE'
-          ViewerProtocolPolicy: redirect-to-https
-          OriginRequestPolicyId: "216adef6-5c7f-47e4-b989-5492eafa07d3" # Managed-AllViewer
-          CachePolicyId: '4135ea2d-6df8-44a3-9df3-4b5a84be39ad' # Managed-CachingDisabled
-          TargetOriginId: "LoadBalancerOrigin"
+####################################################################################
+#  CloudFront won't work as long as the HTTPSListener uses self-signed certificate #
+####################################################################################
+
+#  CloudFrontDistro:
+#    Type: AWS::CloudFront::Distribution
+#    Properties:
+#      DistributionConfig:
+#        Enabled: true
+#        HttpVersion: http2
+#        Origins:
+#          - DomainName: !GetAtt LoadBalancer.DNSName
+#            Id: 'LoadBalancerOrigin'
+#            CustomOriginConfig:
+#              OriginProtocolPolicy: https-only
+#              OriginSSLProtocols:
+#                - TLSv1.2
+#              OriginReadTimeout: 60
+#        DefaultCacheBehavior:
+#          AllowedMethods:
+#            - 'HEAD'
+#            - 'GET'
+#            - 'OPTIONS'
+#            - 'PUT'
+#            - 'PATCH'
+#            - 'POST'
+#            - 'DELETE'
+#          ViewerProtocolPolicy: redirect-to-https
+#          OriginRequestPolicyId: "216adef6-5c7f-47e4-b989-5492eafa07d3" # Managed-AllViewer
+#          CachePolicyId: '4135ea2d-6df8-44a3-9df3-4b5a84be39ad' # Managed-CachingDisabled
+#          TargetOriginId: "LoadBalancerOrigin"
 
   ###################
   # Services
@@ -325,6 +329,10 @@ Outputs:
     Value: !Ref HTTPSListener
     Export:
       Name: !Sub "${app}-http-listener-arn"
+  LoadBalancerEndpoint:
+    Value: !Sub "https://${LoadBalancer.DNSName}"
+    Export:
+      Name: !Sub "${app}-lb-endpoint"
   ServicesCluster:
     Value: !Ref ServicesCluster
     Export:

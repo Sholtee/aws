@@ -34,3 +34,11 @@ aws cloudformation ${action}-stack `
   --template-body file://./foundation.yml `
   --parameters "ParameterKey=app,ParameterValue=${app}" "ParameterKey=certificateArn,ParameterValue=${certificateArn}" `
   --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND
+
+aws cloudformation wait stack-${action}-complete --region ${region} --stack-name ${stackName}
+
+aws cloudformation describe-stacks `
+    --stack-name ${stackName} `
+    --region ${region} `
+    --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerEndpoint'].OutputValue" `
+    --output text
