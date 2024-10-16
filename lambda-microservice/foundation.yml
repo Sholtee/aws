@@ -97,7 +97,7 @@ Resources:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref 404HandlerLambda
-      Principal: !GetAtt RequestSignerUserArn.Value
+      Principal: !GetAtt RequestSignerLambdaRoleArn.Value
       Action: lambda:InvokeFunctionUrl
       FunctionUrlAuthType: AWS_IAM
             
@@ -281,12 +281,12 @@ Resources:
       Export: !Sub "${app}-request-signer-lambda-arn"
       ServiceToken: !GetAtt FetchGlobalOutputFunction.Arn
 
-  RequestSignerUserArn:
+  RequestSignerLambdaRoleArn:
     Type: AWS::CloudFormation::CustomResource
     Properties:
       DeploymentId: !Ref deploymentId
       Stack: !Sub "${app}-globals"
-      Export: !Sub "${app}-request-signer-user-arn"
+      Export: !Sub "${app}-request-signer-lambda-role-arn"
       ServiceToken: !GetAtt FetchGlobalOutputFunction.Arn
 
   FetchGlobalOutputFunction:
@@ -560,10 +560,10 @@ Outputs:
     Value: !Ref DbSecret
     Export:
       Name: !Sub "${app}-db-secret-arn"
-  RequestSignerUserArn:
-    Value: !GetAtt RequestSignerUserArn.Value
+  RequestSignerRoleArn:
+    Value: !GetAtt RequestSignerLambdaRoleArn.Value
     Export:
-      Name: !Sub "${app}-request-signer-user-arn"
+      Name: !Sub "${app}-request-signer-role-arn"
   Subnet1Id:
     Value: !Ref VpcPrivateSubnet1
     Export:

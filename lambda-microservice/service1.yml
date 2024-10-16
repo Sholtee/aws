@@ -126,7 +126,7 @@ Resources:
         - !Ref RequestHandlerLambdaVersionAlias
         - !Ref RequestHandlerLambda
       Principal:
-        Fn::ImportValue: !Sub "${app}-request-signer-user-arn"
+        Fn::ImportValue: !Sub "${app}-request-signer-role-arn"
       Action: 'lambda:InvokeFunctionUrl'
       FunctionUrlAuthType: AWS_IAM
 

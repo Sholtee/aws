@@ -10,6 +10,18 @@ Parameters:
     Type: String
     Description: The application name (including prefix)
     MaxLength: '32'
+  exposeErrorInfo:
+    Type: String
+    AllowedValues:
+      - true
+      - false
+    Description: Expose exception information
+    Default: true
+
+Conditions:
+  ExposeErrorInfo: !Equals
+    - !Ref exposeErrorInfo
+    - true
 
 Resources:
   RequestSignerUser:
@@ -28,95 +40,107 @@ Resources:
                   - lambda:InvokeFunctionUrl
                 Resource: "*"
 
-  RequestSignerUserAccessKey:
-    Type: AWS::IAM::AccessKey
-    Properties:
-      UserName: !Ref RequestSignerUser
-
   RequestSignerLambda:
     Type: AWS::Lambda::Function
     Properties:
       Description: Lambda that signs the incoming requests. Required for IAM validation
       Code:
-        ZipFile: !Sub |
-          'use strict';
-          const
-            {SSMClient, GetParameterCommand} = require('@aws-sdk/client-ssm'),
-            {SignatureV4} = require('@aws-sdk/signature-v4'),
-            {createHash, createHmac} = require('crypto'),
-            {parse} = require('querystring'),
+        ZipFile: !Sub
+          - |
+            'use strict';
+            const
+              {SignatureV4} = require('@aws-sdk/signature-v4'),
+              {createHash, createHmac} = require('crypto'),
+              {parse} = require('querystring'),
 
-            ssmClient = new SSMClient({region: '${AWS::Region}'}),
-            sigV4 = new SignatureV4({
-              service: 'lambda',
-              region: '${AWS::Region}',
-              credentials: async function() {
-                return {
-                  accessKeyId: await getParameter('${app}-request-signer-user-access-key'),
-                  secretAccessKey: await getParameter('${app}-request-signer-user-secret')
-                };       
-              },
-              sha256: function(secret) {
-                return secret ? createHmac('sha256', secret) : createHash('sha256');
-              }
-            }),
-            excludedHeaders = (async function() {
-              return (await getParameter('${app}-request-signer-excluded-headers')).split(',');
-            })();
-            
-          exports.handler = async function(event, context, callback) {
-            try {
-              console.log('Lambda context: ' + JSON.stringify(context));
-              console.log('Request available: ' + JSON.stringify(event));
-      
-              const
-                request = event.Records[0].cf.request,
-                eh = await excludedHeaders,
-                signed = await sigV4.sign(
-                  {
-                    hostname: request.headers.host[0].value,
-                    method: request.method,
-                    protocol: 'https:',
-                    path: request.uri,
-                    query: request.querystring
-                      ? parse(request.querystring)
-                      : null,
-                    headers: Object
-                      .entries(request.headers)
-                      .filter(([key]) => eh.indexOf(key) < 0)
-                      .map(([_, header]) => ({[header[0].key]: header[0].value}))
-                      .reduce((accu, curr) => ({...accu, ...curr}), {}),
-                    body: request.body?.data && request.body.encoding === 'base64'
-                      ? Buffer.from(request.body.data, request.body.encoding)
-                      : request.body?.data
+              sigV4 = new SignatureV4({
+                service: 'lambda',
+                region: '${AWS::Region}',
+                credentials: async () => ({  // must be async
+                  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+                  sessionToken: process.env.AWS_SESSION_TOKEN
+                }),
+                sha256: function(secret) {  // must be a ctor -> function
+                  return secret ? createHmac('sha256', secret) : createHash('sha256');
+                }
+              }),
+              excludedHeaders = getExcludedHeaders();
+              
+            exports.handler = async function(event, context, callback) {
+              try {
+                console.log('Lambda context: ' + JSON.stringify(context));
+                console.log('Request available: ' + JSON.stringify(event));
+        
+                const
+                  request = event.Records[0].cf.request,
+                  eh = await excludedHeaders,
+                  signed = await sigV4.sign(
+                    {
+                      hostname: request.headers.host[0].value,
+                      method: request.method,
+                      protocol: 'https:',
+                      path: request.uri,
+                      query: request.querystring
+                        ? parse(request.querystring)
+                        : null,
+                      headers: Object
+                        .entries(request.headers)
+                        .filter(([key]) => !eh.has(key))
+                        .map(([, header]) => ({[header[0].key]: header[0].value}))
+                        .reduce((accu, curr) => ({...accu, ...curr}), {}),
+                      body: request.body?.data && request.body.encoding === 'base64'
+                        ? Buffer.from(request.body.data, request.body.encoding)
+                        : request.body?.data
+                    },
+                    {
+                      signingRegion: /(?<urlid>\w+)\.lambda-url\.(?<region>[\w-]+)\.on\.aws/i
+                        .exec(request.headers.host[0].value)
+                        .groups
+                        .region
+                    }
+                  );
+                
+                request.headers = Object
+                  .entries(signed.headers)
+                  .map(([key, value]) => ({[key.toLowerCase()]: [{key: key, value}]}))
+                  .reduce((accu, curr) => ({...accu, ...curr}), {});
+                
+                console.log('Request signed successfully: ' + JSON.stringify(request));
+    
+                return callback(null, request);
+              } catch (err) {
+                console.error(err);
+                return callback(null, {
+                  status: '500',
+                  statusDescription: 'Internal server error',
+                  headers: {
+                    'content-type': [{
+                      key: 'Content-Type',
+                      value: 'application/json'
+                    }]
                   },
-                  {
-                    signingRegion: /(?<urlid>\w+)\.lambda-url\.(?<region>[\w-]+)\.on\.aws/i
-                      .exec(request.headers.host[0].value)
-                      .groups
-                      .region
-                  }
+                  body: JSON.stringify({
+                    error: ${ErrorResp}
+                  })
+                });
+              }
+            };
+            
+            async function getExcludedHeaders() {
+              const
+                {SSMClient, GetParameterCommand} = require('@aws-sdk/client-ssm'),
+                ssmClient = new SSMClient({region: '${AWS::Region}'}),
+                ret = await ssmClient.send(
+                  new GetParameterCommand({Name: '${RequestSignerExcludedHeaders}'})
                 );
-              
-              request.headers = Object
-                .entries(signed.headers)
-                .map(([key, value]) => ({[key.toLowerCase()]: [{key: key, value}]}))
-                .reduce((accu, curr) => ({...accu, ...curr}), {});
-              
-              console.log('Request signed successfully: ' + JSON.stringify(request));
-  
-              return callback(null, request);
-            } catch (err) {
-              console.error(err);
-              return callback(err);
+            
+              return new Set(ret.Parameter.Value.split(','));
             }
-          };
-          
-          async function getParameter(name) {
-            return (await ssmClient.send(new GetParameterCommand({Name: name})))
-              .Parameter
-              .Value;
-          }
+          - ErrorResp: !If
+              - ExposeErrorInfo
+              - 'err.toString()'
+              - '"Internal server error"'
       FunctionName: !Sub "${app}-request-signer"
       Handler: index.handler
       Role: !GetAtt RequestSignerLambdaRole.Arn
@@ -182,27 +206,12 @@ Resources:
       Value: x-forwarded-for,te
       Type: String
 
-  RequestSignerUserKey:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub "${app}-request-signer-user-access-key"
-      Value: !Ref RequestSignerUserAccessKey
-      Type: String
-
-  RequestSignerUserSecret:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub "${app}-request-signer-user-secret"
-      Value: !GetAtt RequestSignerUserAccessKey.SecretAccessKey
-      Type: String
-
 Outputs:
   RequestSignerLambdaArn:  # export among regions not supported
     Value: !Ref RequestSignerLambdaVersion
     Export:
       Name: !Sub "${app}-request-signer-lambda-arn"
-
-  RequestSignerUserArn:
-    Value: !GetAtt RequestSignerUser.Arn
+  RequestSignerLambdaRoleArn:
+    Value: !GetAtt RequestSignerLambdaRole.Arn
     Export:
-      Name: !Sub "${app}-request-signer-user-arn"
+      Name: !Sub "${app}-request-signer-lambda-role-arn"
