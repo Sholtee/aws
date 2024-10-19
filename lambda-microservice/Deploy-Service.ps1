@@ -56,6 +56,7 @@ Compress-Archive -Path .\${service}\* -DestinationPath .\${service}.zip
 try {
   aws lambda update-function-code `
     --profile ${profile} `
+    --region ${region} `
     --function-name ${functionName} `
     --zip-file "fileb://./${service}.zip" `
     --no-cli-pager
@@ -63,15 +64,16 @@ try {
   Remove-Item -Path .\${service}.zip -Force
 }
 
-aws lambda wait function-updated --profile ${profile} --function-name ${functionName}
+aws lambda wait function-updated --profile ${profile} --region ${region} --function-name ${functionName}
 
 $versions = (
-  $(aws lambda list-versions-by-function --profile ${profile} --function-name ${functionName}) | ConvertFrom-Json
+  $(aws lambda list-versions-by-function --profile ${profile} --region ${region} --function-name ${functionName}) | ConvertFrom-Json
 ).Versions
 if ($versions.Length -gt 1) {
   Write-Host "Arming a new version..."
   $newVersion = $(aws lambda publish-version `
     --profile ${profile} `
+    --region ${region} `
     --function-name ${functionName} `
     --output text `
     --query 'Version'`
@@ -80,11 +82,12 @@ if ($versions.Length -gt 1) {
 
   aws lambda update-alias `
     --profile ${profile} `
+    --region ${region} `
     --function-name ${functionName} `
     --function-version ${newVersion} `
     --name armed-version
 
-  aws lambda wait function-updated --profile ${profile} --function-name ${functionName}
+  aws lambda wait function-updated --profile ${profile} --region ${region} --function-name ${functionName}
 }
 
 Write-Host "All ok"
