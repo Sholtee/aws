@@ -32,50 +32,6 @@ Resources:
     Metadata:
       aws:cdk:path: KB/OpenSearch/Resource
 
-  OpenSearchAdmin:
-    Type: AWS::IAM::User
-    Properties:
-      UserName: OpenSearchAdmin
-    Metadata:
-      aws:cdk:path: KB/OpenSearch/Admin/Resource
-
-  OpenSearchAdminCredentials:
-    Type: AWS::IAM::AccessKey
-    Properties:
-      Status: Active
-      UserName: !Ref OpenSearchAdmin
-    Metadata:
-      aws:cdk:path: KB/OpenSearch/Admin/Credentials
-
-  OpenSearchAdminGroup:
-    Type: AWS::IAM::Group
-    Metadata:
-      aws:cdk:path: KB/OpenSearch/Admin/Group
-
-  OpenSearchAdminPolicies:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: OpenSearchAdmins
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Action: aoss:*
-            Resource: "*"
-      Groups:
-        - !Ref OpenSearchAdminGroup
-    Metadata:
-      aws:cdk:path: KB/OpenSearch/Admin/Policies
-
-  OpenSearchAdmins:
-    Type: AWS::IAM::UserToGroupAddition
-    Properties:
-      GroupName: !Ref OpenSearchAdminGroup
-      Users:
-        - !Ref OpenSearchAdmin
-    Metadata:
-      aws:cdk:path: KB/OpenSearch/Admin/UserToGroupAddition
-
   OpenSearchEncryptionPolicy:
     Type: AWS::OpenSearchServerless::SecurityPolicy
     Properties:
@@ -133,7 +89,7 @@ Resources:
                 ResourceType: index
             Principal:
               - !GetAtt BedrockExecutionRole.Arn
-              - !GetAtt OpenSearchAdmin.Arn
+              - !GetAtt OpenSearchIndexUpdaterLambdaRole.Arn
               - !Sub "arn:aws:iam::${AWS::AccountId}:root"
             Description: "-"
       Type: data
@@ -185,7 +141,7 @@ Resources:
             mkdir = promisify(require('fs').mkdir),
             {tmpdir} = require('os'),
             {join} = require('path'),
-            {REGION, OS_ENDPOINT, ADMIN_KEY, ADMIN_SECRET} = process.env;
+            {REGION, OS_ENDPOINT, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN} = process.env;
           
           exports.handler = async function(event, context) {
             try {
@@ -211,8 +167,9 @@ Resources:
                     service: 'aoss',
                     async getCredentials() {  // needs to be async
                       return {
-                        accessKeyId: ADMIN_KEY,
-                        secretAccessKey: ADMIN_SECRET
+                        accessKeyId: AWS_ACCESS_KEY_ID,
+                        secretAccessKey: AWS_SECRET_ACCESS_KEY,
+                        sessionToken: AWS_SESSION_TOKEN
                       };
                     }
                   }),
@@ -267,8 +224,6 @@ Resources:
         Variables:
           REGION: !Ref AWS::Region
           OS_ENDPOINT: !GetAtt OpenSearchCollection.CollectionEndpoint
-          ADMIN_KEY: !Ref OpenSearchAdminCredentials
-          ADMIN_SECRET: !GetAtt OpenSearchAdminCredentials.SecretAccessKey
     Metadata:
       aws:cdk:path: KB/OpenSearch/Index/UpdaterLambda/Resource
 
@@ -284,6 +239,14 @@ Resources:
             Principal:
               Service:
                 - lambda.amazonaws.com
+      Policies:
+        - PolicyName: allowOpenSearchAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: aoss:*
+                Resource: "*"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
     Metadata:

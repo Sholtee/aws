@@ -52,14 +52,16 @@ Resources:
               {SignatureV4} = require('@aws-sdk/signature-v4'),
               {createHash, createHmac} = require('crypto'),
               {parse} = require('querystring'),
+            
+              {AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN} = process.env,
 
               sigV4 = new SignatureV4({
                 service: 'lambda',
                 region: '${AWS::Region}',
                 credentials: async () => ({  // must be async
-                  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-                  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-                  sessionToken: process.env.AWS_SESSION_TOKEN
+                  accessKeyId: AWS_ACCESS_KEY_ID,
+                  secretAccessKey: AWS_SECRET_ACCESS_KEY,
+                  sessionToken: AWS_SESSION_TOKEN
                 }),
                 sha256: function(secret) {  // must be a ctor -> function
                   return secret ? createHmac('sha256', secret) : createHash('sha256');
