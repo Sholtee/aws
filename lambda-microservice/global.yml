@@ -24,22 +24,6 @@ Conditions:
     - true
 
 Resources:
-  RequestSignerUser:
-    Type: AWS::IAM::User
-    Description: CloudFront user to sign the incoming requests
-    Properties:
-      UserName: !Sub "${app}-request-signer"
-      Path: "/"
-      Policies:
-        - PolicyName: allowLambdaUrlInvocation
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - lambda:InvokeFunctionUrl
-                Resource: "*"
-
   RequestSignerLambda:
     Type: AWS::Lambda::Function
     Properties:
