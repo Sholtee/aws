@@ -32,16 +32,16 @@ $stackName = "${app}-${service}"
 if (!$skipImageUpdate) {
   docker build --file ${service}/Dockerfile --platform linux/amd64 --force-rm --tag ${stackName} .
 
-  $ecrHost = "$(aws sts get-caller-identity --query Account --output text).dkr.ecr.${region}.amazonaws.com"
+  $ecrHost = "$(aws sts get-caller-identity --profile ${profile} --region ${region} --query Account --output text).dkr.ecr.${region}.amazonaws.com"
 
-  aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${ecrHost}
+  aws ecr get-login-password --profile $profile --region $region | docker login --username AWS --password-stdin $ecrHost
   try {
     $image = "${ecrHost}/${app}-repository:${app}-${service}-$((New-Guid).ToString('N'))"
 
     docker tag $(docker images --filter=reference=$app-$service --format "{{.ID}}") $image
     docker push $image
   } finally {
-    docker logout ${ecrHost}
+    docker logout $ecrHost
   }
 
   $imageParam = "ParameterValue=${image}"
