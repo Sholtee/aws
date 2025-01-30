@@ -1,4 +1,4 @@
-# Home of my AWS playground
+# Home of my AWS playground ![GitHub last commit (branch)](https://img.shields.io/github/last-commit/sholtee/aws/main)
 
 ## Boilerplate templates
 - [api gateway - iam authenticated](/api-gateway-iam-auth/readme.md)
