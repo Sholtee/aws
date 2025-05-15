@@ -1,0 +1,17 @@
+{
+  "name": "auth-handler",
+  "version": "0.0.0",
+  "dependencies": {
+    "cookie": "^1.0.2",
+    "jsonwebtoken": "^9.0.2",
+    "@smithy/protocol-http": "^5.1.0"
+  },
+  "optionalDependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.806.0",
+    "@aws-sdk/credential-providers": "^3.810.0",
+    "@aws-sdk/signature-v4": "^3.374.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

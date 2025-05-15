@@ -1,0 +1,5 @@
+{
+  "exposeExcInfo": false,
+  "appName": "my-app",
+  "excludedHeaders": ["x-forwarded-for", "te"]
+}

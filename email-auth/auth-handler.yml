@@ -1,0 +1,90 @@
+#####################################################
+# auth-handler.yml
+#
+# Author: Denes Solti
+#####################################################
+Description: Lambda edge infra meant to intercept all the requests to enforce authentication. Needs to be deployed in US-EAST-1
+
+Resources:
+  AuthenticatorLambda:
+   Type: AWS::Lambda::Function
+   Properties:
+    Code:
+      ZipFile: '// PLACEHOLDER'
+    FunctionName: !Ref AWS::StackName
+    Handler: index.main
+    Role: !GetAtt AuthenticatorLambdaRole.Arn
+    Runtime: nodejs22.x
+    Timeout: 5
+    MemorySize: 128
+
+  AuthenticatorLambdaVersion:
+    Type: AWS::Lambda::Version
+    Properties:
+      FunctionName: !Ref AuthenticatorLambda
+
+  AuthenticatorLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}"
+      RetentionInDays: 90
+
+  AuthenticatorLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+            - edgelambda.amazonaws.com
+            - replicator.lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+        - PolicyName: allowCloudFrontReplication
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+                - lambda:GetFunction
+                - lambda:EnableReplication*
+                - lambda:InvokeFunction
+                - iam:CreateServiceLinkedRole
+                - cloudfront:UpdateDistribution
+              Resource: '*'
+        - PolicyName: allowSecretManagerAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref AuthenticatorSecret
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
+  AuthenticatorSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${AWS::StackName}-secret"
+      GenerateSecretString:
+        SecretStringTemplate: '{}'
+        GenerateStringKey: privateKey
+        ExcludePunctuation: true
+        PasswordLength: 64
+
+Outputs:
+  authenticatorLambdaArn:
+    Description: ARN and version of the authenticator lambda
+    Value: !Ref AuthenticatorLambdaVersion
+    Export:
+      Name: !Sub "${AWS::StackName}-lambda-arn"
+  authenticatorSecretArn:
+    Description: ARN of the secret containing the private key
+    Value: !Ref AuthenticatorSecret
+    Export:
+      Name: !Sub "${AWS::StackName}-secret-arn"
