@@ -20,18 +20,20 @@ $localName = "auth-handler"
 $app = (Get-Content ".\$localName\config.json" -Raw | ConvertFrom-Json).appName
 $stackName = "$app-authenticator"
 
-$stackId = $(aws cloudformation $action-stack `
+aws cloudformation $action-stack `
   --profile $profile `
   --region us-east-1 `
   --stack-name "$stackName" `
   --template-body "file://./$localName.yml" `
-  --capabilities CAPABILITY_NAMED_IAM `
-  --output text `
-  --query StackId
-)
-if ($stackId) {
+  --capabilities CAPABILITY_NAMED_IAM | Out-Null
+
+if ($?) {
   Write-Host "Updating the stack..."
   aws cloudformation wait stack-${action}-complete --profile $profile --region us-east-1 --stack-name $stackName
+
+  if (!$?) {
+    throw "Stack update failed"
+  }
 }
 
 Write-Host "Deploying function code..."
