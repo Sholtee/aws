@@ -47,7 +47,13 @@ describe('SessionManagerSafe', () => {
         }
       ]
     };
-    handler = new SessionManagerSafe({appName: 'my-app', privateKey: 'secret'});
+
+    const mockSmClient = jasmine.createSpyObj('SecretsManagerClient', ['send']);
+    mockSmClient.send.and.callFake(async () => ({
+      SecretString: JSON.stringify({privateKey: 'secret'})
+    }));
+
+    handler = new SessionManagerSafe(mockSmClient);
   });
 
   it('should set the session header on valid sessions', async () => {
@@ -140,16 +146,20 @@ describe('SessionManagerSafe', () => {
     checkSigned(response);
   });
 
-  it('should return anon user on missing session', async () => {
-    const response = await handler.sign(request);
+  [true, false].forEach(hasCookieHeader =>
+    it(`should return anon user on missing session (has cookie header: ${hasCookieHeader})`, async () => {
+      if (!hasCookieHeader)
+        delete request.Records[0].cf.request.headers.cookie;
 
-    expect(response).toBe(request.Records[0].cf.request);
-    expect(response.headers[`x-${config.appName}-session`][0].value).toBe(JSON.stringify({
-      username: null,
-      roles: ['anonymous']
-    }));
-    checkSigned(response);
-  });
+      const response = await handler.sign(request);
+
+      expect(response).toBe(request.Records[0].cf.request);
+      expect(response.headers[`x-${config.appName}-session`][0].value).toBe(JSON.stringify({
+        username: null,
+        roles: ['anonymous']
+      }));
+      checkSigned(response, hasCookieHeader);
+  }));
 
   it('should prevent session forgery (no session)', async () => {
     request.Records[0].cf.request.headers[`x-${config.appName}-session`] = [{
@@ -178,7 +188,8 @@ describe('SessionManagerSafe', () => {
         }
       });
 
-      handler = new SessionManagerSafe({appName: 'my-app', privateKey: 'secret', exposeExcInfo});
+      await handler.initialized;
+      handler.config.exposeExcInfo = exposeExcInfo;
       const response = await handler.sign(request);
 
       expect(response !== request.Records[0].cf.request).toBeTrue();
@@ -188,7 +199,7 @@ describe('SessionManagerSafe', () => {
   });
 });
 
-function checkSigned({headers}) {
+function checkSigned({headers}, hasCookieHeader = true) {
   expect('x-amz-date' in headers).toBeTrue();
   expect('x-amz-content-sha256' in headers).toBeTrue();
 
@@ -196,6 +207,6 @@ function checkSigned({headers}) {
 
   expect(authHeader).toBeDefined();
   expect(authHeader.startsWith('AWS4-HMAC-SHA256 ')).toBeTrue();
-  expect(authHeader.includes('SignedHeaders=cookie;host;x-amz-content-sha256;x-amz-date;x-my-app-session')).toBeTrue();
+  expect(authHeader.includes(`SignedHeaders=${hasCookieHeader ? 'cookie;' : ''}host;x-amz-content-sha256;x-amz-date;x-my-app-session`)).toBeTrue();
   expect(authHeader.includes('Signature=')).toBeTrue();
 }

@@ -23,15 +23,15 @@ export default class RequestSigner {
     sha256
   });
 
-  #initialised;
+  #initialized;
   #config;
 
-  constructor(configOverride = null) {
-    this.#initialised = this.init(configOverride);
+  constructor(...initParams) {
+    this.#initialized = this.init(...initParams);
   }
 
   async sign({Records: [{cf: {request}}]}) {
-    await this.#initialised;
+    await this.#initialized;
     return await this.transformRequest(request);
   }
 
@@ -87,11 +87,17 @@ export default class RequestSigner {
     return this.#config;
   }
 
-  async init(configOverride) {
-    // we cannot set env vars for Lambda@Edge
-    this.#config = configOverride || (await import('./config.json', {
+  get initialized() {
+    return this.#initialized;
+  }
+
+  async init() {
+    // we cannot set env vars for Lambda@Edge so grab the config from json
+    const {default: config} = await import('./config.json', {
       with: { type: 'json' }
-    })).default;
+    });
+
+    this.#config = config;
 
     console.log('[SIGN-400] Init complete');
   }

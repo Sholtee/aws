@@ -6,7 +6,7 @@
  *****************************************************/
 'use strict';
 
-import {GetSecretValueCommand, SecretsManagerClient} from '@aws-sdk/client-secrets-manager';
+import {GetSecretValueCommand} from '@aws-sdk/client-secrets-manager';
 import cookie from 'cookie';
 import jwt from 'jsonwebtoken';
 import RequestSigner  from './request-signer.mjs';
@@ -14,6 +14,12 @@ import RequestSigner  from './request-signer.mjs';
 const INTERNAL_ERROR = 'Internal server error';
 
 class SessionManager extends RequestSigner {
+  #privateKey;
+
+  constructor(secretsManagerClient) {
+    super(secretsManagerClient);
+  }
+
   async transformRequest(request) {
     // extract the username and roles (fields like "exp" can be disregarded)
     const {username = null, roles = ['anonymous']} = this.#getSession(request.headers.cookie) || {};
@@ -31,9 +37,14 @@ class SessionManager extends RequestSigner {
     return await super.transformRequest(request);
   }
 
-  async init(configOverride) {
-    await super.init(configOverride);
-    this.config.privateKey ||= await this.#readSecret();
+  async init(secretsManagerClient) {
+    await super.init();
+
+    const {SecretString} = await secretsManagerClient.send(new GetSecretValueCommand({
+      SecretId: `${this.config.appName}-authenticator-secret`
+    }));
+
+    this.#privateKey = JSON.parse(SecretString).privateKey;
 
     console.log('[SEMA-400] Init complete');
   }
@@ -47,27 +58,13 @@ class SessionManager extends RequestSigner {
       if (!sessionCookie)
         throw 'No session cookie provided';
 
-      const session = jwt.verify(sessionCookie, this.config.privateKey);
+      const session = jwt.verify(sessionCookie, this.#privateKey);
       console.log(`[SEMA-401] Session verified: ${JSON.stringify(session)}`);
 
       return session;
     } catch (err) {
       console.log(`[SEMA-402] Failed to verify the session: ${err}`);
     }
-  }
-
-  async #readSecret() {
-    const
-      client = new SecretsManagerClient({
-        // Lambda@Edge might be replicated into different regions so we need to set the correct region
-        // in which we have the secret
-        region: 'us-east-1'
-      }),
-      {SecretString} = await client.send(new GetSecretValueCommand({
-        SecretId: `${this.config.appName}-authenticator-secret`
-      }));
-
-    return JSON.parse(SecretString).privateKey;
   }
 };
 
