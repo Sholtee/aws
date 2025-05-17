@@ -1,0 +1,75 @@
+//***********************************************
+  * login.sass
+  * Project: email-auth
+  *
+  * Author: Denes Solti
+  ***********************************************
+body
+  background-color: #fafafa
+
+  > .card
+    $space-small: .5rem
+
+    position: absolute
+    left: 50%
+    transform: translateX(-50%)
+    top: 10rem
+    display: flex
+    flex-flow: column
+    width: 18rem
+    height: 18rem
+    box-shadow: 0 1px 1px 0 #00000024, 0 2px 1px -1px #0000001f, 0 1px 3px 0 #0003
+    border-radius: 3px
+    background-color: #fff
+
+    > *
+      width: 100%
+      padding: $space-small
+      box-sizing: border-box
+
+    > .head
+      display: block
+
+      > .title
+        font-weight: bold
+        font-size: 1.5rem
+        margin-bottom: $space-small
+
+    > .body
+      display: flex
+      height: 100%
+
+      > .input-holder
+        position: relative
+        margin: auto
+
+        &:before, &:after
+          position: absolute
+          color: crimson
+          transform: translateY(100%)
+          bottom: -.3rem
+          left: 0
+          width: max-content
+          line-height: 1.4rem
+
+        &[data-error]:before
+          content: "\026A0"
+          margin-right: $space-small
+
+        &:after
+          content: attr(data-error)
+          margin-left: 1.5rem
+
+        > input
+          padding: $space-small
+
+    > .foot
+      display: flex
+      box-sizing: border-box
+      border-top: 1px solid #1b1f2326
+
+      > button
+        margin-left: auto
+        margin-top: auto
+        margin-bottom: auto
+        width: 5rem
