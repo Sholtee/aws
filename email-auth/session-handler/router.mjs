@@ -9,10 +9,9 @@ import createRouter from 'router';
 export default class Router {
   #router;
   #sessionHeaderName;
+  #exposeExcInfo;
 
-  exposeExcInfo = false;
-
-  constructor(appName) {
+  constructor({appName, exposeExcInfo = false}) {
     this.#router = createRouter();
     this.#router.use((req, res, next) => {
       console.log(`[ROUT-400] [${req.id}] Request available: ${JSON.stringify({...req, body: !!req.body})}`);
@@ -21,15 +20,11 @@ export default class Router {
       next();
     });
     this.#sessionHeaderName = `x-${appName}-session`;
+    this.#exposeExcInfo = exposeExcInfo;
   }
 
-  register(callback) {
-    const {method, path} = callback;
-
-    this.#router[method.toLowerCase()](
-      path,
-      (req, writeResponse) => callback(req, writeResponse)  // do not pass the next() callback
-    );
+  register({method, path, handler}) {
+    this.#router[method.toLowerCase()](path, handler);
   }
 
   async route({path: url, httpMethod: method, headers, body, isBase64Encoded, requestContext: {requestId: id}}) {
@@ -39,12 +34,14 @@ export default class Router {
           console.error(`[ROUT-200] [${id}] ${err}`);
 
           writeResponse(Router.#createResponse(500, {
-            error: this.exposeExcInfo ? err.toString() : 'Internal server error'
+            id,
+            error: this.#exposeExcInfo ? err.toString() : 'Internal server error'
           }));
         } else {
           console.log(`[ROUT-401] [${id}] Handler not found for "${url}"`);
 
           writeResponse(Router.#createResponse(404, {
+            id,
             reason: 'Not Found'
           }));
         }

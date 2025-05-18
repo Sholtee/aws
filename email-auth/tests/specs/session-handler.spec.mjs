@@ -11,7 +11,7 @@ describe('Router', () => {
   let router, request;
 
   beforeEach(() => {
-    router = new Router('my-app');
+    router = new Router({appName: 'my-app'});
     request = {
       "path": "/",
       "httpMethod": "GET",
@@ -50,19 +50,19 @@ describe('Router', () => {
       "body": "Hello from Lambda!",
       "isBase64Encoded": false
     };
-  })
+  });
 
   it('should route', async () => {
-    const callback = (req, writeResponse) => {
-      expect(req.url).toBe('/pet/spikey');
-      expect(req.params.id).toBe('spikey');
-      expect(req.user.username).toBe('test_user');
-      writeResponse({status: 200});
-    };
-    callback.method = 'GET';
-    callback.path = '/pet/:id';
-
-    router.register(callback);
+    router.register({
+      method: 'GET',
+      path: '/pet/:id',
+      handler(req, writeResponse)  {
+        expect(req.url).toBe('/pet/spikey');
+        expect(req.params.id).toBe('spikey');
+        expect(req.user.username).toBe('test_user');
+        writeResponse({status: 200});
+      }
+    });
 
     request.path = '/pet/spikey';
 
@@ -75,16 +75,35 @@ describe('Router', () => {
     expect(response.status).toBe(404);
   });
 
+  it('should return 404 on unhandled match', async () => {
+    let handlerCalled = false;
+
+    router.register({
+      method: 'GET',
+      path: '/',
+      handler(req, writeResponse, notFound)  {
+        handlerCalled = true;
+        notFound();
+      }
+    });
+
+    const response = await router.route(request);
+
+    expect(handlerCalled).toBeTrue();
+    expect(response.status).toBe(404);
+  });
+
   Object.entries({'Some error': true, 'Internal server error': false}).forEach(([ error, exposeExcInfo]) => {
     it(`should return HTTP 500 on internal error with message: "${error}"`,  async () => {
-      const callback = () => {
-        throw 'Some error'
-      };
-      callback.method = 'GET';
+      router = new Router({appName: 'my-app', exposeExcInfo});
 
-      request.path =callback.path = '/error';
-      router.register(callback);
-      router.exposeExcInfo = exposeExcInfo;
+      router.register({
+        method: 'GET',
+        path: request.path = '/error',
+        async handler()  {
+          throw 'Some error'
+        }
+      });
 
       const response = await router.route(request);
       expect(response.status).toBe(500);
