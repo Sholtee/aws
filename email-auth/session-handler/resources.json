@@ -1,0 +1,5 @@
+{
+  "NOT_FOUND": "Not found",
+  "NOT_FOUND_LONG": "The requested resource was not found",
+  "INTERNAL_ERROR": "Internal server error"
+}

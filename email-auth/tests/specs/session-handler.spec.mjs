@@ -4,8 +4,9 @@
  *
  * Author: Denes Solti
  *****************************************************/
-import Router from '../../session-handler/router.mjs';
+import { decode } from 'html-entities';
 
+import Router from '../../session-handler/router.mjs';
 
 describe('Router', () => {
   let router, request;
@@ -60,14 +61,14 @@ describe('Router', () => {
         expect(req.url).toBe('/pet/spikey');
         expect(req.params.id).toBe('spikey');
         expect(req.user.username).toBe('test_user');
-        writeResponse({status: 200});
+        writeResponse({statusCode: 200});
       }
     });
 
     request.path = '/pet/spikey';
 
     const response = await router.route(request);
-    expect(response.status).toBe(200);
+    expect(response.statusCode).toBe(200);
   });
 
   it('should not chain handlers', async () => {
@@ -75,7 +76,7 @@ describe('Router', () => {
       method: 'GET',
       path: '/pet/',
       handler(req, writeResponse)  {
-        writeResponse({status: 304});
+        writeResponse({statusCode: 304});
       }
     });
 
@@ -84,19 +85,19 @@ describe('Router', () => {
       path: '/pet/spikey',
       handler(req, writeResponse)  {
         expect(req.url).toBe('/pet/spikey');
-        writeResponse({status: 200});
+        writeResponse({statusCode: 200});
       }
     });
 
     request.path = '/pet/spikey';
 
     const response = await router.route(request);
-    expect(response.status).toBe(200);
+    expect(response.statusCode).toBe(200);
   });
 
   it('should return 404 on no match', async () => {
     const response = await router.route(request);
-    expect(response.status).toBe(404);
+    expect(response.statusCode).toBe(404);
   });
 
   it('should return 404 on unhandled match', async () => {
@@ -114,7 +115,7 @@ describe('Router', () => {
     const response = await router.route(request);
 
     expect(handlerCalled).toBeTrue();
-    expect(response.status).toBe(404);
+    expect(response.statusCode).toBe(404);
   });
 
   Object.entries({'Some error': true, 'Internal server error': false}).forEach(([ error, exposeExcInfo]) => {
@@ -130,8 +131,10 @@ describe('Router', () => {
       });
 
       const response = await router.route(request);
-      expect(response.status).toBe(500);
-      expect(JSON.parse(response.body).error).toEqual(error)
+      expect(response.statusCode).toBe(500);
+
+      const match = decode(/<div class="content">(.*?)<\/div>/i.exec(response.body)[1]);
+      expect(JSON.parse(match).error).toEqual(error)
     });
   });
 });

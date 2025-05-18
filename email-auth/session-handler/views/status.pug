@@ -1,0 +1,17 @@
+//-**********************************************
+  * status.pug
+  * Project: email-auth
+  *
+  * Author: Denes Solti
+  ***********************************************
+extends _layout
+
+block head
+  :style status.sass
+block card-title
+  span=statusCode
+block card-details
+  span=statusMessage
+block card-body
+  .content-holder
+    .content=details

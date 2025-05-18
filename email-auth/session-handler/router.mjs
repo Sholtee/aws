@@ -6,6 +6,9 @@
  *****************************************************/
 import createRouter from 'router';
 
+import RESOURCES from './resources.json' with {type: 'json'};
+import {VIEWS} from './views.mjs';
+
 export default class Router {
   #router;
   #sessionHeaderName;
@@ -33,29 +36,31 @@ export default class Router {
         if (err) {
           console.error(`[ROUT-200] [${requestId}] ${err}`);
 
-          writeResponse(Router.#createResponse(500, {
+          writeResponse(Router.#createResponse(500, RESOURCES.INTERNAL_ERROR, {
             requestId,
-            error: this.#exposeExcInfo ? err.toString() : 'Internal server error'
+            error: this.#exposeExcInfo ? err.toString() : RESOURCES.INTERNAL_ERROR
           }));
         } else {
           console.log(`[ROUT-401] [${requestId}] Handler not found for "${url}"`);
 
-          writeResponse(Router.#createResponse(404, {
+          writeResponse(Router.#createResponse(404, RESOURCES.NOT_FOUND,{
             requestId,
-            reason: 'Not Found'
+            reason: RESOURCES.NOT_FOUND_LONG
           }));
         }
       });
     });
   }
 
-  static #createResponse(status, body) {
+  static #createResponse(statusCode, statusMessage, body) {
     return {
-      status,
-      headers: {
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify(body)
+      statusCode,
+      headers: {'content-type': 'text/html'},
+      body: VIEWS.status({
+        statusCode,
+        statusMessage,
+        details: JSON.stringify(body)
+      })
     };
   }
 };

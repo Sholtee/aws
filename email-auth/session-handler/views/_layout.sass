@@ -1,0 +1,46 @@
+//***********************************************
+  * _layout.sass
+  * Project: email-auth
+  *
+  * Author: Denes Solti
+  ***********************************************
+=layout()
+  body
+    --space-small: .5rem
+    --input-boder: 1px solid rgba(27, 31, 35, 0.15)
+    --input-border-radius: 3px
+
+    background-color: #fafafa
+
+    > .card
+      position: absolute
+      left: 50%
+      transform: translateX(-50%)
+      top: 10rem
+      display: flex
+      flex-flow: column
+      width: 18rem
+      height: 18rem
+      box-shadow: 0 1px 1px 0 #00000024, 0 2px 1px -1px #0000001f, 0 1px 3px 0 #0003
+      border-radius: 3px
+      background-color: #fff
+
+      > *
+        width: 100%
+        padding: var(--space-small)
+        box-sizing: border-box
+
+      > .head
+        display: block
+
+        > .title
+          font-weight: bold
+          font-size: 1.5rem
+          margin-bottom: var(--space-small)
+
+      > .body
+        display: flex
+        flex-flow: column
+        height: 100%
+
+        @content
