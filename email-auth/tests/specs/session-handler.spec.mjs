@@ -70,6 +70,30 @@ describe('Router', () => {
     expect(response.status).toBe(200);
   });
 
+  it('should not chain handlers', async () => {
+    router.register({
+      method: 'GET',
+      path: '/pet/',
+      handler(req, writeResponse)  {
+        writeResponse({status: 304});
+      }
+    });
+
+    router.register({
+      method: 'GET',
+      path: '/pet/spikey',
+      handler(req, writeResponse)  {
+        expect(req.url).toBe('/pet/spikey');
+        writeResponse({status: 200});
+      }
+    });
+
+    request.path = '/pet/spikey';
+
+    const response = await router.route(request);
+    expect(response.status).toBe(200);
+  });
+
   it('should return 404 on no match', async () => {
     const response = await router.route(request);
     expect(response.status).toBe(404);
