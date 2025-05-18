@@ -17,7 +17,7 @@ export default class Router {
   constructor({appName, exposeExcInfo = false}) {
     this.#router = createRouter();
     this.#router.use((req, res, next) => {
-      console.log(`[ROUT-400] [${req.id}] Request available: ${JSON.stringify({...req, body: !!req.body})}`);
+      console.log(`[ROUT-400] [${req.requestId}] Request available: ${JSON.stringify({...req, body: !!req.body})}`);
 
       req.user = JSON.parse(req.headers[this.#sessionHeaderName]);
       next();

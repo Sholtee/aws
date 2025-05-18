@@ -10,9 +10,10 @@ import SessionManagerSafe from '../../auth-handler/session-manager.mjs';
 import config from '../../auth-handler/config.json' with {type: 'json'};
 
 describe('SessionManagerSafe', () => {
-  let request, handler, context = {requestId: 'request_id'};
+  let request, handler, context;
 
   beforeEach(() => {
+    context = {awsRequestId: 'request_id'};
     request = {
       "Records": [
         {
@@ -194,7 +195,7 @@ describe('SessionManagerSafe', () => {
 
       expect(response !== request.Records[0].cf.request).toBeTrue();
       expect(response.status).toBe('500');
-      expect(response.body).toBe(JSON.stringify({requestId: context.requestId, error}));
+      expect(response.body).toBe(JSON.stringify({requestId: context.awsRequestId, error}));
     });
   });
 });

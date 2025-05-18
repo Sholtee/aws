@@ -73,7 +73,7 @@ export default class SessionManagerSafe extends SessionManager {
     try {
       return await super.sign(request, context);
     } catch (ex) {
-      const {requestId} = context;
+      const {awsRequestId: requestId} = context;
 
       console.error(`[SEMA-200] [${requestId}] Unhandled exception occurred: ${ex}`);
 
