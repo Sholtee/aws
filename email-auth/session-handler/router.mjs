@@ -14,6 +14,12 @@ export default class Router {
 
   constructor(appName) {
     this.#router = createRouter();
+    this.#router.use((req, res, next) => {
+      console.log(`[ROUT-400] [${req.id}] Request available: ${JSON.stringify({...req, body: !!req.body})}`);
+
+      req.user = JSON.parse(req.headers[this.#sessionHeaderName]);
+      next();
+    });
     this.#sessionHeaderName = `x-${appName}-session`;
   }
 
@@ -22,30 +28,26 @@ export default class Router {
 
     this.#router[method.toLowerCase()](
       path,
-      (req, writeResponse, next) => {
-        console.log(`[ROUT-400] Matching request available: ${{...req, body: !!req.body}}`);
-
-        req.user = JSON.parse(req.headers[this.#sessionHeaderName]);
-        next();
-      },
-      (req, writeResponse) => callback(req, writeResponse),  // do not pass the next() callback
-      (err, req, writeResponse, _) => {  // 4 parameters must be provided to act as an error handler
-        console.error(`[ROUT-200] ${err}`);
-
-        writeResponse(Router.#createResponse(500, {
-          error: this.exposeExcInfo ? err.toString() : 'Internal server error'
-        }));
-      }
+      (req, writeResponse) => callback(req, writeResponse)  // do not pass the next() callback
     );
   }
 
-  async route({path: url, httpMethod: method, headers, body, isBase64Encoded}) {
-    return new Promise(resolve => {
-      this.#router({url, method, headers, body, isBase64Encoded}, resolve, () => {
-        // TODO: log the url
-        resolve(Router.#createResponse(404, {
-          reason: 'Not Found'
-        }));
+  async route({path: url, httpMethod: method, headers, body, isBase64Encoded, requestContext: {requestId: id}}) {
+    return new Promise(writeResponse => {
+      this.#router({url, method, headers, body, isBase64Encoded, id}, writeResponse, err => {
+        if (err) {
+          console.error(`[ROUT-200] [${id}] ${err}`);
+
+          writeResponse(Router.#createResponse(500, {
+            error: this.exposeExcInfo ? err.toString() : 'Internal server error'
+          }));
+        } else {
+          console.log(`[ROUT-401] [${id}] Handler not found for "${url}"`);
+
+          writeResponse(Router.#createResponse(404, {
+            reason: 'Not Found'
+          }));
+        }
       });
     });
   }

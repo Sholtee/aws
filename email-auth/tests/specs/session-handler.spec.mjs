@@ -42,6 +42,9 @@ describe('Router', () => {
           "value"
         ]
       },
+      "requestContext": {
+        "requestId": "request_id"
+      },
       "pathParameters": null,
       "stageVariables": null,
       "body": "Hello from Lambda!",
@@ -78,8 +81,8 @@ describe('Router', () => {
         throw 'Some error'
       };
       callback.method = 'GET';
-      callback.path = '/';
 
+      request.path =callback.path = '/error';
       router.register(callback);
       router.exposeExcInfo = exposeExcInfo;
 
