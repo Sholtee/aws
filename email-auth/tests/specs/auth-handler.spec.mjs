@@ -10,7 +10,7 @@ import SessionManagerSafe from '../../auth-handler/session-manager.mjs';
 import config from '../../auth-handler/config.json' with {type: 'json'};
 
 describe('SessionManagerSafe', () => {
-  let request, handler;
+  let request, handler, context = {requestId: 'request_id'};
 
   beforeEach(() => {
     request = {
@@ -68,7 +68,7 @@ describe('SessionManagerSafe', () => {
       "value": `name=value;${config.appName}-session=${cookie}`
     }];
 
-    const response = await handler.sign(request);
+    const response = await handler.sign(request, context);
 
     expect(response).toBe(request.Records[0].cf.request);
     expect(response.headers[`x-${config.appName}-session`][0].value).toBe(JSON.stringify({
@@ -98,7 +98,7 @@ describe('SessionManagerSafe', () => {
       })
     }];
 
-    const response = await handler.sign(request);
+    const response = await handler.sign(request, context);
 
     expect(response).toBe(request.Records[0].cf.request);
     expect(response.headers[`x-${config.appName}-session`][0].value).toBe(JSON.stringify({
@@ -120,7 +120,7 @@ describe('SessionManagerSafe', () => {
       "value": `name=value;${config.appName}-session=${cookie}`
     }];
 
-    const response = await handler.sign(request);
+    const response = await handler.sign(request, context);
 
     expect(response).toBe(request.Records[0].cf.request);
     expect(response.headers[`x-${config.appName}-session`][0].value).toBe(JSON.stringify({
@@ -136,7 +136,7 @@ describe('SessionManagerSafe', () => {
       "value": `name=value;${config.appName}-session=invalid`
     }];
 
-    const response = await handler.sign(request);
+    const response = await handler.sign(request, context);
 
     expect(response).toBe(request.Records[0].cf.request);
     expect(response.headers[`x-${config.appName}-session`][0].value).toBe(JSON.stringify({
@@ -151,7 +151,7 @@ describe('SessionManagerSafe', () => {
       if (!hasCookieHeader)
         delete request.Records[0].cf.request.headers.cookie;
 
-      const response = await handler.sign(request);
+      const response = await handler.sign(request, context);
 
       expect(response).toBe(request.Records[0].cf.request);
       expect(response.headers[`x-${config.appName}-session`][0].value).toBe(JSON.stringify({
@@ -170,7 +170,7 @@ describe('SessionManagerSafe', () => {
       })
     }];
 
-    const response = await handler.sign(request);
+    const response = await handler.sign(request, context);
 
     expect(response).toBe(request.Records[0].cf.request);
     expect(response.headers[`x-${config.appName}-session`][0].value).toBe(JSON.stringify({
@@ -190,11 +190,11 @@ describe('SessionManagerSafe', () => {
 
       await handler.initialized;
       handler.config.exposeExcInfo = exposeExcInfo;
-      const response = await handler.sign(request);
+      const response = await handler.sign(request, context);
 
       expect(response !== request.Records[0].cf.request).toBeTrue();
       expect(response.status).toBe('500');
-      expect(response.body).toBe(JSON.stringify({error}));
+      expect(response.body).toBe(JSON.stringify({requestId: context.requestId, error}));
     });
   });
 });

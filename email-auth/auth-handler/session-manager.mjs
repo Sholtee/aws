@@ -20,11 +20,11 @@ class SessionManager extends RequestSigner {
     super(secretsManagerClient);
   }
 
-  async transformRequest(request) {
+  async transformRequest(request, requestId) {
     // extract the username and roles (fields like "exp" can be disregarded)
-    const {username = null, roles = ['anonymous']} = this.#getSession(request.headers.cookie) || {};
+    const {username = null, roles = ['anonymous']} = this.#getSession(request.headers.cookie, requestId) || {};
 
-    console.log('[SEMA-402] Attaching the session header');
+    console.log(`[SEMA-402] [${requestId}] Attaching the session header`);
 
     // attach the session header
     RequestSigner.createHeaderEntry(
@@ -34,7 +34,7 @@ class SessionManager extends RequestSigner {
     );
 
     // sign the request
-    return await super.transformRequest(request);
+    return await super.transformRequest(request, requestId);
   }
 
   async init(secretsManagerClient) {
@@ -49,7 +49,7 @@ class SessionManager extends RequestSigner {
     console.log('[SEMA-400] Init complete');
   }
 
-  #getSession(cookieHeader) {
+  #getSession(cookieHeader, requestId) {
     try {
       const sessionCookie = cookieHeader?.reduce(
         (acc, {value}) => ({...acc, ...cookie.parse(value)}),
@@ -59,27 +59,31 @@ class SessionManager extends RequestSigner {
         throw 'No session cookie provided';
 
       const session = jwt.verify(sessionCookie, this.#privateKey);
-      console.log(`[SEMA-401] Session verified: ${JSON.stringify(session)}`);
+      console.log(`[SEMA-401] [${requestId}] Session verified: ${JSON.stringify(session)}`);
 
       return session;
     } catch (err) {
-      console.log(`[SEMA-402] Failed to verify the session: ${err}`);
+      console.log(`[SEMA-402] [${requestId}] Failed to verify the session: ${err}`);
     }
   }
 };
 
 export default class SessionManagerSafe extends SessionManager {
-  async sign(request) {
+  async sign(request, context) {
     try {
-      return await super.sign(request);
+      return await super.sign(request, context);
     } catch (ex) {
-      console.error(`[SEMA-200] Unhandled exception occurred: ${ex}`);
+      const {requestId} = context;
 
-      return RequestSigner.createResponse(
+      console.error(`[SEMA-200] [${requestId}] Unhandled exception occurred: ${ex}`);
+
+      return RequestSigner.createJsonResponse(
         '500',
         INTERNAL_ERROR,
-        JSON.stringify({error: this.config.exposeExcInfo ? ex.toString() : INTERNAL_ERROR}),
-        {'Content-Type': 'application/json'}
+        {
+          requestId,
+          error: this.config.exposeExcInfo ? ex.toString() : INTERNAL_ERROR
+        }
       );
     }
   }

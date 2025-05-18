@@ -27,21 +27,21 @@ export default class Router {
     this.#router[method.toLowerCase()](path, handler);
   }
 
-  async route({path: url, httpMethod: method, headers, body, isBase64Encoded, requestContext: {requestId: id}}) {
+  async route({path: url, httpMethod: method, headers, body, isBase64Encoded, requestContext: {requestId}}) {
     return new Promise(writeResponse => {
-      this.#router({url, method, headers, body, isBase64Encoded, id}, writeResponse, err => {
+      this.#router({url, method, headers, body, isBase64Encoded, requestId}, writeResponse, err => {
         if (err) {
-          console.error(`[ROUT-200] [${id}] ${err}`);
+          console.error(`[ROUT-200] [${requestId}] ${err}`);
 
           writeResponse(Router.#createResponse(500, {
-            id,
+            requestId,
             error: this.#exposeExcInfo ? err.toString() : 'Internal server error'
           }));
         } else {
-          console.log(`[ROUT-401] [${id}] Handler not found for "${url}"`);
+          console.log(`[ROUT-401] [${requestId}] Handler not found for "${url}"`);
 
           writeResponse(Router.#createResponse(404, {
-            id,
+            requestId,
             reason: 'Not Found'
           }));
         }

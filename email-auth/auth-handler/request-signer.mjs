@@ -30,28 +30,27 @@ export default class RequestSigner {
     this.#initialized = this.init(...initParams);
   }
 
-  async sign({Records: [{cf: {request}}]}) {
+  async sign({Records: [{cf: {request}}]}, {awsRequestId: requestId}) {
     await this.#initialized;
-    return await this.transformRequest(request);
+    return await this.transformRequest(request, requestId);
   }
 
-  async transformRequest(request) {
-    console.log(`[SIGN-401] Signing request: ${JSON.stringify({...request, body: !!request.body})}`);
+  async transformRequest(request, requestId) {
+    console.log(`[SIGN-401] [${requestId}] Signing request: ${JSON.stringify({...request, body: !!request.body})}`);
 
     if (request.body?.inputTruncated) {
-      console.warn(`[SIGN-300] Request too large: ${request.headers['content-length'][0]['value']}`);
-      return RequestSigner.createResponse(
+      console.warn(`[SIGN-300] [${requestId}] Request too large: ${request.headers['content-length'][0]['value']}`);
+      return RequestSigner.createJsonResponse(
         '400',
         'Bad request',
-        JSON.stringify({message: 'Request too large'}),
-        {'Content-Type': 'application/json'}
+        {requestId, message: 'Request too large'},
       );
     }
 
     const {signingRegion} = /(?<urlid>\w+)\.lambda-url\.(?<signingRegion>[\w-]+)\.on\.aws/i
       .exec(request.headers.host[0].value)
       .groups;
-    console.log(`[SIGN-401] Signing region: ${signingRegion}`);
+    console.log(`[SIGN-401] [${requestId}] Signing region: ${signingRegion}`);
 
     const {headers: signedHeaders} = await RequestSigner.#sigV4.sign(
       new HttpRequest({
@@ -79,7 +78,7 @@ export default class RequestSigner {
       .map(([key, value]) => ({[key.toLowerCase()]: [{key: key, value}]}))
       .reduce((accu, curr) => ({...accu, ...curr}), {});
 
-    console.log(`[SIGN-403] Headers modified successfully: ${JSON.stringify(request.headers)}`);
+    console.log(`[SIGN-403] [${requestId}] Headers modified successfully: ${JSON.stringify(request.headers)}`);
     return request;
   }
 
@@ -102,14 +101,18 @@ export default class RequestSigner {
     console.log('[SIGN-400] Init complete');
   }
 
-  static createResponse(status, statusDescription, body, headers) {
+  static createJsonResponse(status, statusDescription, body, headers = {}) {
+    headers = {
+      ...headers,
+      'Content-Type': 'application/json'
+    }
     return {
       status,
       statusDescription,
       headers: Object
         .entries(headers)
         .reduce((headers, [key, value]) => RequestSigner.createHeaderEntry(headers, key, value), {}),
-      body
+      body: JSON.stringify(body)
     };
   }
 
