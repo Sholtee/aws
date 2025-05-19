@@ -7,6 +7,7 @@
 import { decode } from 'html-entities';
 
 import Router from '../../session-handler/router.mjs';
+import ServiceContainer from '../../session-handler/service-container.mjs';
 
 describe('Router', () => {
   let router, request;
@@ -136,5 +137,60 @@ describe('Router', () => {
       const match = decode(/<div class="content">(.*?)<\/div>/i.exec(response.body)[1]);
       expect(JSON.parse(match).error).toEqual(error)
     });
+  });
+});
+
+describe('ServiceContainer', () => {
+  class ServiceA {}
+
+  class ServiceB {
+    constructor(serviceA) {
+      this.serviceA = serviceA;
+    }
+  }
+
+  let container;
+
+  beforeEach(() => container = new ServiceContainer());
+
+  it('should resolve the dependency graph', () => {
+    container
+      .configure('serviceA', () => new ServiceA())
+      .configure('serviceB', container => new ServiceB(container.serviceA));
+
+    const {serviceB} = container;
+    expect(serviceB).toBeInstanceOf(ServiceB);
+    expect(serviceB.serviceA).toBeInstanceOf(ServiceA);
+  });
+
+  it('should return undefined on missing dependency', () => {
+    expect(container.service).not.toBeDefined();
+  });
+
+  it('should instantiate lazily', () => {
+    let factoryCalled = false;
+
+    container
+      .configure('serviceA', () => {
+        factoryCalled = true;
+        return new ServiceA();
+      })
+      .configure('serviceB', container => new ServiceB(container.serviceA));
+
+    expect(factoryCalled).toBeFalse();
+    const _ = container.serviceB;
+    expect(factoryCalled).toBeTrue();
+  });
+
+  it('should instantiate only once', () => {
+    let callCount = 0;
+
+    container.configure('serviceA', () => {
+      callCount++;
+      return new ServiceA();
+    });
+
+    expect(container.serviceA).toBe(container.serviceA);
+    expect(callCount).toBe(1);
   });
 });

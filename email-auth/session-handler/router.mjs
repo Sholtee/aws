@@ -14,12 +14,14 @@ export default class Router {
   #sessionHeaderName;
   #exposeExcInfo;
 
-  constructor({appName, exposeExcInfo = false}) {
+  constructor({appName, services = {}, exposeExcInfo = false}) {
     this.#router = createRouter();
     this.#router.use((req, res, next) => {
       console.log(`[ROUT-400] [${req.requestId}] Request available: ${JSON.stringify({...req, body: !!req.body})}`);
 
+      req.services = services;
       req.user = JSON.parse(req.headers[this.#sessionHeaderName]);
+
       next();
     });
     this.#sessionHeaderName = `x-${appName}-session`;
