@@ -11,7 +11,6 @@ import {VIEWS} from './views.mjs';
 
 export default class Router {
   #router;
-  #sessionHeaderName;
   #exposeExcInfo;
 
   constructor({appName, services = {}, exposeExcInfo = false}) {
@@ -20,11 +19,10 @@ export default class Router {
       console.log(`[ROUT-400] [${req.requestId}] Request available: ${JSON.stringify({...req, body: !!req.body})}`);
 
       req.services = services;
-      req.user = JSON.parse(req.headers[this.#sessionHeaderName]);
+      req.user = JSON.parse(req.headers[`x-${appName}-session`]);
 
       next();
     });
-    this.#sessionHeaderName = `x-${appName}-session`;
     this.#exposeExcInfo = exposeExcInfo;
   }
 
