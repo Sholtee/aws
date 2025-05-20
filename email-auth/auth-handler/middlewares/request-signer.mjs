@@ -16,17 +16,16 @@ import {HttpRequest} from '@smithy/protocol-http';
 import {Middleware} from '../middleware.mjs';
 
 export default class RequestSigner extends Middleware {
-  #config;
   #sigV4
 
-  async runCore(request, {createLogger, requestId}) {
+  async runCore(request, {createLogger, config, requestId}) {
     const logger = createLogger('SIGN');
 
     logger.log(400, `Signing request: ${JSON.stringify({...request, body: !!request.body})}`);
 
     if (request.body?.inputTruncated) {
       logger.warn(300, `Request too large: ${request.headers['content-length'][0]['value']}`);
-      return Middleware.createJsonResponse(
+      return this.createJsonResponse(
         '400',
         'Bad request',
         {requestId, message: 'Request too large'},
@@ -38,7 +37,7 @@ export default class RequestSigner extends Middleware {
       .groups;
     logger.log(401, `Signing region: ${signingRegion}`);
 
-    const {headers: signedHeaders} = await RequestSigner.#sigV4.sign(
+    const {headers: signedHeaders} = await this.#sigV4.sign(
       new HttpRequest({
         hostname: request.headers.host[0].value,
         method: request.method,
@@ -49,7 +48,7 @@ export default class RequestSigner extends Middleware {
           : undefined,
         headers: Object
           .entries(request.headers)
-          .filter(([key]) => !this.#config.excludedHeaders?.includes(key.toLowerCase()))
+          .filter(([key]) => !config.excludedHeaders?.includes(key.toLowerCase()))
           .map(([, header]) => ({[header[0].key]: header[0].value}))
           .reduce((accu, curr) => ({...accu, ...curr}), {}),
         body: request.body?.data
@@ -69,13 +68,6 @@ export default class RequestSigner extends Middleware {
   }
 
   async init() {
-    // we cannot set env vars for Lambda@Edge so grab the config from json
-    const {default: config} = await import('../config.json', {
-      with: { type: 'json' }
-    });
-
-    this.#config = config;
-
     this.#sigV4 = new SignatureV4({
       service: 'lambda',
       region: 'us-east-1',

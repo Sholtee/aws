@@ -4,6 +4,7 @@
  *
  * Author: Denes Solti
  *****************************************************/
+import config from './config.json' with {type: 'json'};
 import createLogger from './logger.mjs';
 
 export class Middleware {
@@ -24,7 +25,7 @@ export class Middleware {
     return await this.runCore(request, context, next);
   }
 
-  static createJsonResponse(status, statusDescription, body, headers = {}) {
+  createJsonResponse(status, statusDescription, body, headers = {}) {
     headers = {
       ...headers,
       'Content-Type': 'application/json'
@@ -34,12 +35,12 @@ export class Middleware {
       statusDescription,
       headers: Object
         .entries(headers)
-        .reduce((headers, [key, value]) => Middleware.createHeaderEntry(headers, key, value), {}),
+        .reduce((headers, [key, value]) => this.createHeaderEntry(headers, key, value), {}),
       body: JSON.stringify(body)
     };
   }
 
-  static createHeaderEntry(cookies, key, value) {
+  createHeaderEntry(cookies, key, value) {
     cookies[key.toLowerCase()] = [{key, value}];
     return cookies;
   }
@@ -47,10 +48,12 @@ export class Middleware {
 
 export class RequestHandler {
   #chain;
-  #context = {}
+  #context;
 
   constructor(...middlewares) {
-    let chain = (req, ctx) => throw 'Request could not be processed';
+    let chain = (req, ctx) => {
+      throw 'Request could not be processed';
+    };
 
     for (const middleware of middlewares) {
       const previous = chain;
@@ -58,6 +61,9 @@ export class RequestHandler {
     }
 
     this.#chain = chain;
+    this.#context = {
+      config: {...config} // copy the original config for each instance (due to testing)
+    }
   }
 
   async handle({Records: [{cf: {request}}]}, {awsRequestId: requestId}) {

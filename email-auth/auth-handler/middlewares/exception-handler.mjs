@@ -15,9 +15,9 @@ export default class ExceptionHandler extends Middleware {
     } catch (err) {
       createLogger('UNHA').error(200, `Unhandled exception occurred: ${err}`);
 
-      return Middleware.createJsonResponse('500', INTERNAL_ERROR, {
+      return this.createJsonResponse('500', INTERNAL_ERROR, {
         requestId,
-        error: this.config.exposeExcInfo ? err.toString() : INTERNAL_ERROR
+        error: config.exposeExcInfo ? err.toString() : INTERNAL_ERROR
       });
     }
   }

@@ -19,18 +19,18 @@ export default class SessionManager extends Middleware {
     this.#secretsManagerClient = secretsManagerClient;
   }
 
-  async runCore(request, {createLogger}, next) {
+  async runCore(request, {createLogger, config: {appName}}, next) {
     const logger = createLogger('SEMA');
 
     // extract the username and roles (fields like "exp" can be disregarded)
-    const {username = null, roles = ['anonymous']} = this.#getSession(request.headers.cookie, logger) || {};
+    const {username = null, roles = ['anonymous']} = this.#getSession(request, logger, appName) || {};
 
     logger.log(400, 'Attaching the session header');
 
     // attach the session header
-    Middleware.createHeaderEntry(
+    this.createHeaderEntry(
       request.headers,
-      `x-${this.config.appName}-session`,
+      `x-${appName}-session`,
       JSON.stringify({username, roles})
     );
 
@@ -40,18 +40,18 @@ export default class SessionManager extends Middleware {
 
   async init() {
     const {SecretString} = await this.#secretsManagerClient.send(new GetSecretValueCommand({
-      SecretId: `${this.config.appName}-authenticator-secret`
+      SecretId: `${appName}-authenticator-secret`
     }));
 
     this.#privateKey = JSON.parse(SecretString).privateKey;
   }
 
-  #getSession(cookieHeader, logger) {
+  #getSession({headers: {cookie: cookieHeader}}, logger, appName) {
     try {
       const sessionCookie = cookieHeader?.reduce(
         (acc, {value}) => ({...acc, ...cookie.parse(value)}),
         {}
-      )[`${this.config.appName}-session`];
+      )[`${appName}-session`];
       if (!sessionCookie)
         throw 'No session cookie provided';
 

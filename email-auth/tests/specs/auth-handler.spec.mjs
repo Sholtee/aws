@@ -171,7 +171,7 @@ describe('SessionManagerSafe', () => {
       })
     }];
 
-    const response = await handler.sign(request, context);
+    const response = await handler.handle(request, context);
 
     expect(response).toBe(request.Records[0].cf.request);
     expect(response.headers[`x-${config.appName}-session`][0].value).toBe(JSON.stringify({
@@ -189,7 +189,7 @@ describe('SessionManagerSafe', () => {
         }
       });
 
-      handler.config.exposeExcInfo = exposeExcInfo;
+      handler.context.config.exposeExcInfo = exposeExcInfo;
       const response = await handler.handle(request, context);
 
       expect(response !== request.Records[0].cf.request).toBeTrue();

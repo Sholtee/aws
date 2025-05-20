@@ -14,13 +14,13 @@ import RequestSigner from "./middlewares/request-signer.mjs";
 export class MainRequestHandler extends RequestHandler {
   constructor(secretsManagerClient = null /*to be mocked*/) {
     super(
-      new ExceptionHandler(),
+      new RequestSigner(),
       new SessionManager(secretsManagerClient || new SecretsManagerClient({
         // Lambda@Edge might be replicated into different regions so we need to set the correct region
         // in which we have the secret
         region: 'us-east-1'
       })),
-      new RequestSigner()
+      new ExceptionHandler()
     );
   }
 }
