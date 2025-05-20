@@ -200,22 +200,22 @@ describe('ServiceContainer', () => {
 });
 
 describe('DynamoDb', () => {
-  let
-    mockDocumentClient = mockClient(DynamoDBDocumentClient),
-    mockLowLevelClient = mockClient(DynamoDBClient).on(DescribeTableCommand).resolves({
-      Table: {
-        KeySchema: [
-          {
-            AttributeName: 'primaryKey',
-            KeyType: 'HASH'
-          },
-          {
-            AttributeName: 'sortKey',
-            KeyType: 'RANGE'
-          }
-        ]
-      }
-    });
+  const mockDocumentClient = mockClient(DynamoDBDocumentClient);
+
+  mockClient(DynamoDBClient).on(DescribeTableCommand).resolves({
+    Table: {
+      KeySchema: [
+        {
+          AttributeName: 'primaryKey',
+          KeyType: 'HASH'
+        },
+        {
+          AttributeName: 'sortKey',
+          KeyType: 'RANGE'
+        }
+      ]
+    }
+  });
 
   afterEach(() => mockDocumentClient.reset());
 

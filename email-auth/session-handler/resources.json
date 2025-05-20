@@ -1,5 +1,9 @@
 {
+  "OK": "Ok",
   "NOT_FOUND": "Not found",
   "NOT_FOUND_LONG": "The requested resource was not found",
-  "INTERNAL_ERROR": "Internal server error"
+  "BAD_REQUEST": "Bad request",
+  "INVALID_EMAIL": "Invalid email address provided",
+  "INTERNAL_ERROR": "Internal server error",
+  "TOKEN_SENT": "If the email address you provided is valid, we will send you the authentication token soon"
 }
