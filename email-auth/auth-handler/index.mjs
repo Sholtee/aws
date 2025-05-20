@@ -4,15 +4,27 @@
  *
  * Author: Denes Solti
  *****************************************************/
-'use strict';
-
 import {SecretsManagerClient} from '@aws-sdk/client-secrets-manager';
-import SessionManagerSafe from './session-manager.mjs';
 
-const handler = new SessionManagerSafe(new SecretsManagerClient({
-  // Lambda@Edge might be replicated into different regions so we need to set the correct region
-  // in which we have the secret
-  region: 'us-east-1'
-}));
+import {RequestHandler} from './middleware.mjs';
+import ExceptionHandler from "./middlewares/exception-handler.mjs";
+import SessionManager from "./middlewares/session-manager.mjs";
+import RequestSigner from "./middlewares/request-signer.mjs";
 
-export const main = event => handler.sign(event);
+export class MainRequestHandler extends RequestHandler {
+  constructor(secretsManagerClient = null /*to be mocked*/) {
+    super(
+      new ExceptionHandler(),
+      new SessionManager(secretsManagerClient || new SecretsManagerClient({
+        // Lambda@Edge might be replicated into different regions so we need to set the correct region
+        // in which we have the secret
+        region: 'us-east-1'
+      })),
+      new RequestSigner()
+    );
+  }
+}
+
+const requestHandler = new MainRequestHandler();
+
+export const main = (event, context) => requestHandler.handle(event, context);

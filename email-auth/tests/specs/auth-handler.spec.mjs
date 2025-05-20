@@ -6,7 +6,7 @@
  *****************************************************/
 import jwt from 'jsonwebtoken';
 
-import SessionManagerSafe from '../../auth-handler/session-manager.mjs';
+import {MainRequestHandler} from '../../auth-handler/index.mjs';
 import config from '../../auth-handler/config.json' with {type: 'json'};
 
 describe('SessionManagerSafe', () => {
@@ -54,7 +54,7 @@ describe('SessionManagerSafe', () => {
       SecretString: JSON.stringify({privateKey: 'secret'})
     }));
 
-    handler = new SessionManagerSafe(mockSmClient);
+    handler = new MainRequestHandler(mockSmClient);
   });
 
   it('should set the session header on valid sessions', async () => {
@@ -69,7 +69,7 @@ describe('SessionManagerSafe', () => {
       "value": `name=value;${config.appName}-session=${cookie}`
     }];
 
-    const response = await handler.sign(request, context);
+    const response = await handler.handle(request, context);
 
     expect(response).toBe(request.Records[0].cf.request);
     expect(response.headers[`x-${config.appName}-session`][0].value).toBe(JSON.stringify({
@@ -99,7 +99,7 @@ describe('SessionManagerSafe', () => {
       })
     }];
 
-    const response = await handler.sign(request, context);
+    const response = await handler.handle(request, context);
 
     expect(response).toBe(request.Records[0].cf.request);
     expect(response.headers[`x-${config.appName}-session`][0].value).toBe(JSON.stringify({
@@ -121,7 +121,7 @@ describe('SessionManagerSafe', () => {
       "value": `name=value;${config.appName}-session=${cookie}`
     }];
 
-    const response = await handler.sign(request, context);
+    const response = await handler.handle(request, context);
 
     expect(response).toBe(request.Records[0].cf.request);
     expect(response.headers[`x-${config.appName}-session`][0].value).toBe(JSON.stringify({
@@ -137,7 +137,7 @@ describe('SessionManagerSafe', () => {
       "value": `name=value;${config.appName}-session=invalid`
     }];
 
-    const response = await handler.sign(request, context);
+    const response = await handler.handle(request, context);
 
     expect(response).toBe(request.Records[0].cf.request);
     expect(response.headers[`x-${config.appName}-session`][0].value).toBe(JSON.stringify({
@@ -152,7 +152,7 @@ describe('SessionManagerSafe', () => {
       if (!hasCookieHeader)
         delete request.Records[0].cf.request.headers.cookie;
 
-      const response = await handler.sign(request, context);
+      const response = await handler.handle(request, context);
 
       expect(response).toBe(request.Records[0].cf.request);
       expect(response.headers[`x-${config.appName}-session`][0].value).toBe(JSON.stringify({
@@ -189,9 +189,8 @@ describe('SessionManagerSafe', () => {
         }
       });
 
-      await handler.initialized;
       handler.config.exposeExcInfo = exposeExcInfo;
-      const response = await handler.sign(request, context);
+      const response = await handler.handle(request, context);
 
       expect(response !== request.Records[0].cf.request).toBeTrue();
       expect(response.status).toBe('500');

@@ -13,34 +13,20 @@ import {fromNodeProviderChain} from '@aws-sdk/credential-providers';
 import {SignatureV4} from '@aws-sdk/signature-v4';
 import {HttpRequest} from '@smithy/protocol-http';
 
-const credentials = await fromNodeProviderChain()()
+import {Middleware} from '../middleware.mjs';
 
-export default class RequestSigner {
-  static #sigV4 = new SignatureV4({
-    service: 'lambda',
-    region: 'us-east-1',
-    credentials,
-    sha256
-  });
-
-  #initialized;
+export default class RequestSigner extends Middleware {
   #config;
+  #sigV4
 
-  constructor(...initParams) {
-    this.#initialized = this.init(...initParams);
-  }
+  async runCore(request, {createLogger, requestId}) {
+    const logger = createLogger('SIGN');
 
-  async sign({Records: [{cf: {request}}]}, {awsRequestId: requestId}) {
-    await this.#initialized;
-    return await this.transformRequest(request, requestId);
-  }
-
-  async transformRequest(request, requestId) {
-    console.log(`[SIGN-401] [${requestId}] Signing request: ${JSON.stringify({...request, body: !!request.body})}`);
+    logger.log(400, `Signing request: ${JSON.stringify({...request, body: !!request.body})}`);
 
     if (request.body?.inputTruncated) {
-      console.warn(`[SIGN-300] [${requestId}] Request too large: ${request.headers['content-length'][0]['value']}`);
-      return RequestSigner.createJsonResponse(
+      logger.warn(300, `Request too large: ${request.headers['content-length'][0]['value']}`);
+      return Middleware.createJsonResponse(
         '400',
         'Bad request',
         {requestId, message: 'Request too large'},
@@ -50,7 +36,7 @@ export default class RequestSigner {
     const {signingRegion} = /(?<urlid>\w+)\.lambda-url\.(?<signingRegion>[\w-]+)\.on\.aws/i
       .exec(request.headers.host[0].value)
       .groups;
-    console.log(`[SIGN-401] [${requestId}] Signing region: ${signingRegion}`);
+    logger.log(401, `Signing region: ${signingRegion}`);
 
     const {headers: signedHeaders} = await RequestSigner.#sigV4.sign(
       new HttpRequest({
@@ -78,47 +64,24 @@ export default class RequestSigner {
       .map(([key, value]) => ({[key.toLowerCase()]: [{key: key, value}]}))
       .reduce((accu, curr) => ({...accu, ...curr}), {});
 
-    console.log(`[SIGN-403] [${requestId}] Headers modified successfully: ${JSON.stringify(request.headers)}`);
+    logger.log(402, `Headers modified successfully: ${JSON.stringify(request.headers)}`);
     return request;
-  }
-
-  get config() {
-    return this.#config;
-  }
-
-  get initialized() {
-    return this.#initialized;
   }
 
   async init() {
     // we cannot set env vars for Lambda@Edge so grab the config from json
-    const {default: config} = await import('./config.json', {
+    const {default: config} = await import('../config.json', {
       with: { type: 'json' }
     });
 
     this.#config = config;
 
-    console.log('[SIGN-400] Init complete');
-  }
-
-  static createJsonResponse(status, statusDescription, body, headers = {}) {
-    headers = {
-      ...headers,
-      'Content-Type': 'application/json'
-    }
-    return {
-      status,
-      statusDescription,
-      headers: Object
-        .entries(headers)
-        .reduce((headers, [key, value]) => RequestSigner.createHeaderEntry(headers, key, value), {}),
-      body: JSON.stringify(body)
-    };
-  }
-
-  static createHeaderEntry(cookies, key, value) {
-    cookies[key.toLowerCase()] = [{key, value}];
-    return cookies;
+    this.#sigV4 = new SignatureV4({
+      service: 'lambda',
+      region: 'us-east-1',
+      credentials: await fromNodeProviderChain()(),
+      sha256
+    });
   }
 }
 
