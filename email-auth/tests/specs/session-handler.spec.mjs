@@ -4,8 +4,12 @@
  *
  * Author: Denes Solti
  *****************************************************/
-import { decode } from 'html-entities';
+import {decode} from 'html-entities';
+import {mockClient} from 'aws-sdk-client-mock';
+import {DynamoDBClient, DescribeTableCommand} from '@aws-sdk/client-dynamodb';
+import {DynamoDBDocumentClient, QueryCommand, GetCommand, PutCommand} from '@aws-sdk/lib-dynamodb';
 
+import DynamoDb from '../../session-handler/services/dynamodb.mjs';
 import Router from '../../session-handler/router.mjs';
 import ServiceContainer from '../../session-handler/service-container.mjs';
 
@@ -192,5 +196,98 @@ describe('ServiceContainer', () => {
 
     expect(container.serviceA).toBe(container.serviceA);
     expect(callCount).toBe(1);
+  });
+});
+
+describe('DynamoDb', () => {
+  let
+    mockDocumentClient = mockClient(DynamoDBDocumentClient),
+    mockLowLevelClient = mockClient(DynamoDBClient).on(DescribeTableCommand).resolves({
+      Table: {
+        KeySchema: [
+          {
+            AttributeName: 'primaryKey',
+            KeyType: 'HASH'
+          },
+          {
+            AttributeName: 'sortKey',
+            KeyType: 'RANGE'
+          }
+        ]
+      }
+    });
+
+  afterEach(() => mockDocumentClient.reset());
+
+  it('should query the keys', async () => {
+    const client = new DynamoDb('my-table', null, {
+      DynamoDBClient,
+      DynamoDBDocumentClient,
+      DescribeTableCommand
+    });
+
+    expect(await client.partitionKey).toBe('primaryKey');
+    expect(await client.sortKey).toBe('sortKey');
+  });
+
+  it('should query single item', async () => {
+    mockDocumentClient.on(GetCommand).resolves('result');
+
+    const client = new DynamoDb('my-table', null, {
+      DynamoDBClient,
+      DynamoDBDocumentClient,
+      DescribeTableCommand,
+      GetCommand
+    });
+
+    expect(await client.getItem('cica')).toBe('result');
+
+    const [{args: [{input}]}] = mockDocumentClient.commandCalls(GetCommand);
+    expect(input.TableName).toBe('my-table');
+    expect(input.Key).toEqual({primaryKey: 'cica'});
+  });
+
+  it('should query item list', async () => {
+    mockDocumentClient.on(QueryCommand).resolves({
+      Items: ['result']
+    });
+
+    const client = new DynamoDb('my-table', null, {
+      DynamoDBClient,
+      DynamoDBDocumentClient,
+      DescribeTableCommand,
+      QueryCommand
+    });
+
+    expect(await client.listItems('cica', ['>', 1990], 20)).toEqual(['result']);
+
+    const [{args: [{input}]}] = mockDocumentClient.commandCalls(QueryCommand);
+    expect(input.TableName).toBe('my-table');
+    expect(input.KeyConditionExpression).toBe('primaryKey = :key AND sortKey > :value');
+    expect(input.ExpressionAttributeValues).toEqual({
+      ":key": "cica",
+      ":value": 1990
+    });
+    expect(input.Limit).toBe(20);
+  });
+
+  it('should store item', async () => {
+    mockDocumentClient.on(PutCommand);
+
+    const client = new DynamoDb('my-table', null, {
+      DynamoDBClient,
+      DynamoDBDocumentClient,
+      DescribeTableCommand,
+      PutCommand
+    });
+
+    await client.putItem({primaryKey: 'cica', sortKey: 1000});
+
+    const [{args: [{input}]}] = mockDocumentClient.commandCalls(PutCommand);
+    expect(input.TableName).toBe('my-table');
+    expect(input.Item).toEqual({
+      primaryKey: "cica",
+      sortKey: 1000
+    });
   });
 });
