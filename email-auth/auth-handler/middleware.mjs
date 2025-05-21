@@ -10,19 +10,12 @@ import createLogger from './logger.mjs';
 export class Middleware {
   #initialized = false;
 
-  async init() {}
-
-  async runCore(request, context, next) {
-    throw 'Not implemented';
+  async init() {
+    this.#initialized = true;
   }
 
   async run(request, context, next) {
-    if (!this.#initialized) {
-      await this.init();
-      this.#initialized = true;
-    }
-
-    return await this.runCore(request, context, next);
+    throw 'Not implemented';
   }
 
   createJsonResponse(status, statusDescription, body, headers = {}) {
@@ -44,37 +37,48 @@ export class Middleware {
     cookies[key.toLowerCase()] = [{key, value}];
     return cookies;
   }
+
+  get initialized() {
+    return this.#initialized;
+  }
 }
 
 export class RequestHandler {
-  #chain;
-  #context;
+  #middlewares;
+  #config = {...config}; // copy the original config for each instance (due to testing)
+  #services = {};
 
   constructor(...middlewares) {
-    let chain = (req, ctx) => {
-      throw 'Request could not be processed';
-    };
-
-    for (const middleware of middlewares) {
-      const previous = chain;
-      chain = (req, ctx) => middleware.run(req, ctx, previous);
-    }
-
-    this.#chain = chain;
-    this.#context = {
-      config: {...config} // copy the original config for each instance (due to testing)
-    }
+    this.#middlewares = middlewares.map(cls => new cls());
   }
 
-  async handle({Records: [{cf: {request}}]}, {awsRequestId: requestId}) {
-    return await this.#chain(request, {
-      ...this.#context,
+  handle({Records: [{cf: {request}}]}, {awsRequestId: requestId}) {
+    const context = {
+      config: this.#config,
+      services: this.#services,
       createLogger: createLogger.bind(null, requestId),
       requestId
-    });
+    };
+
+    return invokeNext(this.#middlewares);
+
+    async function invokeNext(remaining) {
+      const [middleware] = remaining;
+      if (!middleware)
+        throw 'Request could not be processed';
+
+      if (!middleware.initialized)
+        await middleware.init(context.config, context.services);
+
+      return await middleware.run(request, context, invokeNext.bind(null, remaining.slice(1)));
+    }
   }
 
-  get context() {
-    return this.#context;
+  get config() {
+    return this.#config;
+  }
+
+  get services() {
+    return this.#services;
   }
 }

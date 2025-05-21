@@ -6,11 +6,11 @@
  *****************************************************/
 import jwt from 'jsonwebtoken';
 
-import {MainRequestHandler} from '../../auth-handler/index.mjs';
+import {requestHandler as handler} from '../../auth-handler/index.mjs';
 import config from '../../auth-handler/config.json' with {type: 'json'};
 
 describe('SessionManagerSafe', () => {
-  let request, handler, context;
+  let request, context;
 
   beforeEach(() => {
     context = {awsRequestId: 'request_id'};
@@ -54,7 +54,7 @@ describe('SessionManagerSafe', () => {
       SecretString: JSON.stringify({privateKey: 'secret'})
     }));
 
-    handler = new MainRequestHandler(mockSmClient);
+    handler.services.secretsManagerClient = mockSmClient;
   });
 
   it('should set the session header on valid sessions', async () => {
@@ -189,7 +189,7 @@ describe('SessionManagerSafe', () => {
         }
       });
 
-      handler.context.config.exposeExcInfo = exposeExcInfo;
+      handler.config.exposeExcInfo = exposeExcInfo;
       const response = await handler.handle(request, context);
 
       expect(response !== request.Records[0].cf.request).toBeTrue();

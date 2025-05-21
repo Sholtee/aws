@@ -18,7 +18,7 @@ import {Middleware} from '../middleware.mjs';
 export default class RequestSigner extends Middleware {
   #sigV4
 
-  async runCore(request, {createLogger, config, requestId}) {
+  async run(request, {createLogger, config: {excludedHeaders}, requestId}) {
     const logger = createLogger('SIGN');
 
     logger.log(400, `Signing request: ${JSON.stringify({...request, body: !!request.body})}`);
@@ -48,7 +48,7 @@ export default class RequestSigner extends Middleware {
           : undefined,
         headers: Object
           .entries(request.headers)
-          .filter(([key]) => !config.excludedHeaders?.includes(key.toLowerCase()))
+          .filter(([key]) => !excludedHeaders?.includes(key.toLowerCase()))
           .map(([, header]) => ({[header[0].key]: header[0].value}))
           .reduce((accu, curr) => ({...accu, ...curr}), {}),
         body: request.body?.data
@@ -74,6 +74,8 @@ export default class RequestSigner extends Middleware {
       credentials: await fromNodeProviderChain()(),
       sha256
     });
+
+    await super.init();
   }
 }
 
