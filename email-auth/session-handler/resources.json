@@ -5,5 +5,6 @@
   "BAD_REQUEST": "Bad request",
   "INVALID_EMAIL": "Invalid email address provided",
   "INTERNAL_ERROR": "Internal server error",
-  "TOKEN_SENT": "If the email address you provided is valid, we will send you the authentication token soon"
+  "TOKEN_SENT": "If the email address you provided is valid, we will send you the authentication token soon",
+  "LOGIN_TOKEN": "login token"
 }

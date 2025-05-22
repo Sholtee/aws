@@ -12,7 +12,7 @@ export const
 export async function sendToken(request, writeResponse) {
   const {
     params: {email},
-    services: {usersDb, attemptsDb, config},
+    services: {usersDb, attemptsDb, ses, config},
     createLogger
   } = request;
 
@@ -51,6 +51,8 @@ export async function sendToken(request, writeResponse) {
       });
 
       // send the actual email
+      const messageId = await ses.send(email, RESOURCES.LOGIN_TOKEN, 'mail-body', {token});
+      logger.log(502, `Email successfully sent: ${messageId}`);
     }
   }
 
