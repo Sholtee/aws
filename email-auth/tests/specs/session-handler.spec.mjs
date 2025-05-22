@@ -8,10 +8,12 @@ import {decode} from 'html-entities';
 import {mockClient} from 'aws-sdk-client-mock';
 import {DynamoDBClient, DescribeTableCommand} from '@aws-sdk/client-dynamodb';
 import {DynamoDBDocumentClient, QueryCommand, GetCommand, PutCommand} from '@aws-sdk/lib-dynamodb';
+import {SESClient, SendEmailCommand} from '@aws-sdk/client-ses';
 
 import DynamoDb from '../../session-handler/services/dynamodb.mjs';
 import Router from '../../session-handler/router.mjs';
 import ServiceContainer from '../../session-handler/service-container.mjs';
+import Ses from "../../session-handler/services/ses.msj.js";
 
 describe('Router', () => {
   let router, request;
@@ -291,3 +293,26 @@ describe('DynamoDb', () => {
     });
   });
 });
+
+describe('Ses', () => {
+  const mockSess = mockClient(SESClient);
+
+  afterEach(() => mockSess.reset());
+
+  it('should send emails', async () => {
+    mockSess.on(SendEmailCommand).resolves({
+      MessageId: 'message_id'
+    });
+
+    const
+      sess = new Ses('sender@email.hu', null, {SESClient, SendEmailCommand}),
+      id = await sess.send('recipient@email.co', 'test email', 'mail-body', {token: 'token'});
+
+    expect(id).toBe('message_id');
+
+    const [{args: [{input}]}] = mockSess.commandCalls(SendEmailCommand);
+    expect(input.Source).toBe('sender@email.hu');
+    expect(input.Destination.ToAddresses[0]).toBe('recipient@email.co');
+    expect(input.Message.Body.Html.Data).toBe('Your login code is: "token"');
+  });
+})
