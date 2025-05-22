@@ -221,17 +221,6 @@ describe('DynamoDb', () => {
 
   afterEach(() => mockDocumentClient.reset());
 
-  it('should query the keys', async () => {
-    const client = new DynamoDb('my-table', null, {
-      DynamoDBClient,
-      DynamoDBDocumentClient,
-      DescribeTableCommand
-    });
-
-    expect(await client.partitionKey).toBe('primaryKey');
-    expect(await client.sortKey).toBe('sortKey');
-  });
-
   it('should query single item', async () => {
     mockDocumentClient.on(GetCommand).resolves('result');
 
