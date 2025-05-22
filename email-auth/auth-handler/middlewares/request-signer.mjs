@@ -4,8 +4,6 @@
  *
  * Author: Denes Solti
  *****************************************************/
-'use strict';
-
 import {createHash, createHmac} from 'crypto';
 import {parse} from 'querystring';
 
