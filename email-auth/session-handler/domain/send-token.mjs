@@ -23,12 +23,7 @@ export async function sendToken(request, writeResponse) {
   if (!isEmail(email)) {
     logger.log(501, `User provided bad email: ${email}`);
 
-    writeResponse(VIEWS.status({
-      statusCode: 400,
-      statusMessage: RESOURCES.BAD_REQUEST,
-      details: RESOURCES.INVALID_EMAIL
-    }));
-
+    respond(400, RESOURCES.BAD_REQUEST, RESOURCES.INVALID_EMAIL);
     return;
   }
 
@@ -58,9 +53,17 @@ export async function sendToken(request, writeResponse) {
 
   // do not let the caller try to guess the allowed attempt count or the registered email
   // addresses
-  writeResponse(VIEWS.status({
-    statusCode: 200,
-    statusMessage: 'Ok',
-    details: RESOURCES.TOKEN_SENT
-  }))
+  respond(200, RESOURCES.OK, RESOURCES.TOKEN_SENT);
+
+  function respond(statusCode, statusMessage, body) {
+    writeResponse({
+      statusCode,
+      headers: {'content-type': 'text/html'},
+      body: VIEWS.status({
+        statusCode,
+        statusMessage,
+        details: body
+      })
+    });
+  }
 }

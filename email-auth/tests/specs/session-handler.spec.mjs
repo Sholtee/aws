@@ -10,10 +10,12 @@ import {DynamoDBClient, DescribeTableCommand} from '@aws-sdk/client-dynamodb';
 import {DynamoDBDocumentClient, QueryCommand, GetCommand, PutCommand} from '@aws-sdk/lib-dynamodb';
 import {SESClient, SendEmailCommand} from '@aws-sdk/client-ses';
 
+import createLogger from '../../session-handler/logger.mjs';
 import DynamoDb from '../../session-handler/services/dynamodb.mjs';
 import Router from '../../session-handler/router.mjs';
+import {sendToken} from '../../session-handler/domain/send-token.mjs';
 import ServiceContainer from '../../session-handler/service-container.mjs';
-import Ses from "../../session-handler/services/ses.msj.js";
+import Ses from '../../session-handler/services/ses.mjs';
 
 describe('Router', () => {
   let router, request;
@@ -304,4 +306,60 @@ describe('Ses', () => {
     expect(input.Destination.ToAddresses[0]).toBe('recipient@email.co');
     expect(input.Message.Body.Html.Data).toBe('Your login code is: "token"');
   });
-})
+});
+
+describe('SendToken', () => {
+  let request, response;
+
+  const writeResponse = resp => response = resp;
+
+  beforeEach(() => {
+    request = {
+      params: {email: 'test@email.hu'},
+      services: {usersDb: null, attemptsDb: null, ses: null, config: null},
+      createLogger: createLogger.bind(null, 'test-session')
+    };
+    response = null;
+  });
+
+  it('should return 400 on bad email', async () => {
+    request.params.email = 'bad';
+    await sendToken(request, writeResponse);
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('should return 200 on unknown email', async () => {
+    const userDb = jasmine.createSpyObj('usersDb', ['getItem']);
+    userDb.getItem.and.callFake(async () => false);
+
+    request.params.email = 'test@email.hu';
+    request.services.usersDb = userDb;
+
+    await sendToken(request, writeResponse);
+
+    expect(response.statusCode).toBe(200);
+    expect(userDb.getItem).toHaveBeenCalledWith('test@email.hu');
+  });
+
+  it('should return 200 on too many attempts', async () => {
+    const userDb = jasmine.createSpyObj('usersDb', ['getItem']);
+    userDb.getItem.and.callFake(async () => true);
+
+    const attemptsDb = jasmine.createSpyObj('attemptsDb', ['listItems']);
+    attemptsDb.listItems.and.callFake(async () => [null, null]);
+
+    request.params.email = 'test@email.hu';
+    request.services.usersDb = userDb;
+    request.services.attemptsDb = attemptsDb;
+    request.services.config = {
+      MAX_ATTEMPTS: 1
+    };
+
+    await sendToken(request, writeResponse);
+
+    expect(response.statusCode).toBe(200);
+    expect(userDb.getItem).toHaveBeenCalledWith('test@email.hu');
+    expect(attemptsDb.listItems).toHaveBeenCalledTimes(1);
+  });
+});

@@ -19,6 +19,9 @@ export default class SessionManager extends Middleware {
       // extract the username and roles (fields like "exp" can be disregarded)
       {username = null, roles = ['anonymous']} = getSession(this.#privateKey);
 
+    // TODO: redirect to login page if the endpoint is annotated (via cloudfront tags) to be
+    //       authenticated
+
     logger.log(400, 'Attaching the session header');
 
     // attach the session header
