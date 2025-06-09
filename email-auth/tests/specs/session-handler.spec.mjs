@@ -362,4 +362,36 @@ describe('SendToken', () => {
     expect(userDb.getItem).toHaveBeenCalledWith('test@email.hu');
     expect(attemptsDb.listItems).toHaveBeenCalledTimes(1);
   });
+
+  it('should return 200 when the email was sent', async () => {
+    const userDb = jasmine.createSpyObj('usersDb', ['getItem']);
+    userDb.getItem.and.callFake(async () => true);
+
+    const attemptsDb = jasmine.createSpyObj('attemptsDb', ['listItems', 'putItem']);
+    attemptsDb.listItems.and.callFake(async () => []);
+    attemptsDb.putItem.and.callFake(async () => undefined);
+
+    const ses = jasmine.createSpyObj('ses', ['send']);
+    ses.send.and.callFake(async () => 'message_id');
+
+    request.params.email = 'test@email.hu';
+    request.services.usersDb = userDb;
+    request.services.attemptsDb = attemptsDb;
+    request.services.ses = ses;
+    request.services.config = {
+      MAX_ATTEMPTS: 1
+    };
+
+    await sendToken(request, writeResponse);
+
+    expect(response.statusCode).toBe(200);
+    expect(userDb.getItem).toHaveBeenCalledWith('test@email.hu');
+    expect(attemptsDb.listItems.calls.argsFor(0)[0]).toBe('test@email.hu');
+
+    const attempt = attemptsDb.putItem.calls.argsFor(0)[0];
+    expect(attempt.email).toBe('test@email.hu');
+    expect(attempt.token).toBeDefined();
+
+    expect(ses.send.calls.argsFor(0)[0]).toBe('test@email.hu');
+  });
 });
